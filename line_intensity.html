@@ -1,0 +1,1496 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Hello World</title>
+</head>
+
+<style>
+canvas {
+  display:block;
+}
+
+#frame {
+  /* Necessary to make sure frame width/height
+  isn't set according to the canvas element */
+  position: absolute;
+  overflow: hidden;
+  
+  /* Optional stuff for positioning */
+  top:50%;
+  left:50%;
+  width: 75%;
+  height: 50%;
+  transform: translate(-50%, -50%);
+  -webkit-transform: translate(-50%, -50%);
+}
+</style>
+<body>
+    <script src="pixi.min.js"></script>
+    <script type="text/javascript">	
+
+        /**
+         * Object used to represent a point on a line, specifically either the start or end point.
+         * The object holds an x and y coordinates along with a graphic used to indicate itself.
+         */
+        class Point {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.image = new PIXI.Graphics();
+                this.image.interactive = true;
+                this.image.buttonMode = true;
+                this.image.beginFill(0xFFFF00);
+                this.image.drawRect(x - 5, y - 5, 10, 10);
+                this.image.endFill();
+                var polyPts;
+                polyPts = [x - 5, y - 5, x - 5, y + 5, x + 5, y + 5, x + 5, y - 5];
+                this.image.hitArea = new PIXI.Polygon(polyPts);
+                app.stage.addChild(this.image);
+                this.owner = -1;
+            }  
+            /**
+             * Used to move the given point to a new location. It starts off by clearing its current
+             * image, then sets its new coordinates, and finally resets its image with the new
+             * coordinates
+             * @param nX the new x coordinate
+             * @param nY the new y coordinate
+             */
+            changeLocation(nX, nY) {
+                this.clearImage();
+                this.x = nX;
+                this.y = nY;
+                this.resetImage();
+            }
+
+            /**
+             * This clears the image graphic of all of its content 
+             */
+            clearImage() {
+                this.image.clear();
+            }
+            /**
+             * Typically used after the clearImage function, this allows the object to draw itself again 
+             * where ever the coordiantes are located.
+             */
+            resetImage() {
+                this.image.beginFill(0xFFFF00);
+                this.image.drawRect(this.x - 5, this.y - 5, 10, 10);
+                this.image.endFill();
+                var polyPts;
+                polyPts = [this.x - 5, this.y - 5, this.x - 5, this.y + 5, this.x + 5, this.y + 5, this.x + 5, this.y - 5];
+                this.image.hitArea = new PIXI.Polygon(polyPts);
+                app.stage.addChild(this.image);
+            }
+
+            setOwner(line) {
+                this.owner = line
+            }
+        }
+
+        /**
+         * Object used to represent a line on the screen. It's major components consists of a start
+         * and end point objects, a grapic used as its visual representation, a name(index number)
+         * and the backgtound image used to gather data.
+         */
+        class Line {
+            constructor(startPoint, endPoint, background, name, image) {
+                this.startPoint = startPoint;
+                this.startPoint.setOwner(this);
+                this.endPoint = endPoint;
+                this.endPoint.setOwner(this);
+                this.background = background;
+                this.name = name;
+                this.image = image;
+                this.data = -1;
+                //This are data fields mostly used to gather/store data
+                this.lineDataPoints = [];
+                this.peakData = [];
+                this.valleyData = [];
+                this.baseline = 0;
+                this.maxValue = 0;
+                this.valueDifference = 0;
+                this.threshold = 5;
+                this.baseline = 0;
+                this.peakStart = 0;
+                this.peakEnd = 0;
+            }
+
+            /**
+             * Simply finds the slope of the line using the coordinates of the start and end point
+             * Isn't currently used. was used previously to determine line function but as of now
+             * has little to no use.
+             */
+            slope() {
+                var changeY = this.endPoint.y - this.startPoint.y;
+                var changeX = this.endPoint.x - this.startPoint.x;
+                var slope = 0;
+                if (changeX != 0) {
+                    slope = (changeY) / (changeX);
+                }
+                return slope;
+            }
+
+            /**
+             * Simply finds the length of the line using the coordinates of the start and end point
+             */
+            length() {
+                var changeY = this.endPoint.y - this.startPoint.y;
+                var changeX = this.endPoint.x - this.startPoint.x;
+                return Math.sqrt(Math.pow(changeY, 2) + Math.pow(changeX, 2));
+            }
+
+            /**
+             * Goes across the line itself and gathers a certain amount of measurements depending on
+             * the length of the line. Measurements are taken with the background image data field
+             * and consists of finding the intensity of the pixels along the line. 
+             */
+            findDataPoints() {
+                //Clears array of previous measurements
+                
+                this.lineDataPoints = [];
+
+                var changeY = this.endPoint.y - this.startPoint.y;
+                var changeX = this.endPoint.x - this.startPoint.x;
+                
+                
+                var entries = 0;
+                var temp = this.length();
+                if (temp < 50) {
+                    //entries = length;
+                    entries = 100;
+                }
+                else if (temp  < 100) {
+                    //entries = length * (3 / 4);
+                    entries = 100;
+                }
+                else if (temp  < 200) {
+                    //entries = length * (2 / 4);
+                    entries = 105;
+                }
+                else if (temp  < 400) {
+                    // entries = length * (1 / 4);
+                    entries = 115;
+                }
+                else if (temp  < 800) {
+                    //entries = length * (1 / 6);
+                    entries = 120;
+                }
+                else {
+                    entries = temp * (1 / 8);
+                }
+                var spaceX = changeX / entries;
+                var currentX = this.startPoint.x;
+                var spaceY = changeY / entries;
+                var currentY = this.startPoint.y;
+                var canvas = app.renderer.plugins.extract.canvas(this.background);
+                var context = canvas.getContext('2d');
+                for (var i = 0; i <= entries; i++) {
+                    
+                   
+                    //Takes the rgba values of a specific pixel and calculates intensity 
+                    //getImageData takes in x-cooridinate/y-coordinate/width/height
+                    //the data is broken into a 1D array with each pixel information
+                    //Being seperated as so R-value/G-value/B-value/alpha-value 
+                    var rgba = context.getImageData(currentX, currentY, 1, 1).data;
+                    var R = rgba[0];
+                    var G = rgba[1];
+                    var B = rgba[2];
+                    var luminance = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+
+                    this.lineDataPoints.push(luminance);
+                    if (i == 0) {
+                        this.maxValue = luminance;
+                        
+                    }
+                    else {
+                        if (this.maxValue < luminance) {
+                            this.maxValue = luminance;
+                            
+                        }
+                    }
+                    //Creates small squares denoting where measurements were taken
+                   /* this.image.beginFill(0xC70039);
+                    this.image.drawRect(currentX - 2, currentY - 2, 4, 4);
+                    this.image.endFill();
+                    app.stage.addChild(this.image);*/
+                    //Increments coordinates
+                    currentX += spaceX;
+                    currentY += spaceY;
+                }
+                this.maxValue = (Math.floor(this.maxValue / 5) + 1) * 5;
+                if (this.maxValue >= 255) {
+                    this.maxValue = 260;
+                }
+                this.valueDifference = this.maxValue;
+            }
+
+            /**
+             * This takes the collected data points found across the line and will look for peaks/local maxima 
+             * within the data. It does this by going point by point and looking a few measurements before and
+             * after and checks if it is the highest of the bunch. The threshold datafield determines how far 
+             * the program searches in either direction.
+             */
+            findPeakData() {
+                this.peakData = [];
+                var dataLength = this.lineDataPoints.length;
+                for (var i = 0; i < dataLength; i++) {
+                    var check = true;
+                    for (var j = 1; j <= this.threshold; j++) {
+                        if ((i - j) >= 0) {
+                            if (this.lineDataPoints[i] < this.lineDataPoints[i - j]) {
+                                check = false;
+                            }
+                        }
+                        if ((i + j) < dataLength) {
+                            if (this.lineDataPoints[i] < this.lineDataPoints[i + j]) {
+                                check = false;
+                            }
+                        }
+                    }
+                    if (check) {
+                        if (i > 0) {
+                            if (this.lineDataPoints[i] == this.lineDataPoints[i - 1]) {
+                                continue;
+                            }
+                        }
+                        this.peakData.push(i);
+                    }
+                }
+            }
+
+            /**
+             * Functions very similarly to findPeakData but instead of fniding peaks/local maxima this functions
+             * searches for valleys/local minima.
+             */
+            findValleyData() {
+                
+                this.valleyData = [];
+                var dataLength = this.lineDataPoints.length;
+                for (var i = 0; i < dataLength; i++) {
+                    var check = true;
+                    for (var j = 1; j <= this.threshold; j++) {
+                        if ((i - j) >= 0) {
+                            if (this.lineDataPoints[i] > this.lineDataPoints[i - j]) {
+                                check = false;
+                            }
+                        }
+                        if ((i + j) < dataLength) {
+                            if (this.lineDataPoints[i] > this.lineDataPoints[i + j]) {
+                                check = false;
+                            }
+                        }
+                    }
+                    if (check) {
+                        if (i > 0) {
+                            if (this.lineDataPoints[i] == this.lineDataPoints[i - 1]) {
+                                continue;
+                            }
+                        }
+                        this.valleyData.push(i);
+                    }
+                }
+                
+            }
+
+            /**
+             * This function is merely a temporary solution for finding this information. Right now to find where 
+             * a massive peak begins and ends the program will look for the biggest space between valleys and only between
+             * valleys that arent that different in value. This isnt very efficient and needs a superior algorithm to 
+             * do this job correctly but this does works for some situations.
+             */
+            findPeak() {
+                
+                var differenceThreshold = 10;
+                var max = 0;
+                var vdLength = this.valleyData.length;
+                for (var i = 1; i < vdLength; i++) {
+                    var seperation = 1; //How far to look for the previous valley point
+                    while (true) {
+                        if (Math.abs(this.lineDataPoints[this.valleyData[i]] - this.lineDataPoints[this.valleyData[i - seperation]]) <= differenceThreshold) {   //checks to see  if valley is in peak or in baseline
+                            //Since valley data is holding the index value we can find how far apart they are from one another in the oringial array
+                            var distance = this.valleyData[i] - this.valleyData[i - seperation]; //The distance between the two points
+                            if (distance > max) {   //if the distance is greater replace previous information
+                                max = distance;
+                                this.peakStart = this.valleyData[i - seperation];
+                                this.peakEnd = this.valleyData[i];
+                            }
+                            break;
+                        }
+                        else {
+                            seperation++; // if the value was found inside peak then look for the next valley 
+                            if (i - seperation < 0) {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            /**
+             * Since the data found from findPeak() isn't the best then results of this function aren't always accurate.
+             * This takes all other data points outside of the massive peak and finds the average to create a baseline for the
+             * background data
+             */
+            findBaseLine() {
+                
+                var summation = 0
+                var counter = 0;
+                var ldLength = this.lineDataPoints.length;
+                for (var i = 0; i < ldLength; i++) {
+                    if (i > this.peakStart && i < this.peakEnd) {
+                        continue;
+                    }
+                    summation += this.lineDataPoints[i];
+                    counter++;
+                }
+                this.baseline = summation / counter;
+                
+            }
+
+            resetStart() {
+                this.clearImage();
+                this.startPoint.clearImage();
+            }
+            resetEnd() {
+                this.clearImage();
+                this.endPoint.clearImage();
+            }
+            changeStart(nX, nY) {
+                this.clearImage();
+                this.startPoint.changeLocation(nX, nY);
+                this.resetImage();
+            }
+            resetEnd() {
+                this.clearImage();
+                this.endPoint.clearImage();
+            }
+
+            /**
+             * This is used whenever trying to permanetly delete a line.This function clears the points on the line while also
+             * clearing the image/data graphics and removes all types of interactivity so that the user no longer has access to
+             * this removed line.
+             */
+            removeLine() {
+                this.startPoint.clearImage();
+                this.endPoint.clearImage();
+                this.clearImage();
+                this.data.clear();
+                this.image.interactive = false;
+                this.image.buttonMode = false;
+                this.hitArea = null;
+            }
+
+            /**
+             * Clears all image graphic information
+             */
+            clearImage() {
+                this.image.clear();
+                this.data.clear();
+            }
+
+            /**
+             * Will redraw the line using the current starting and end point information
+             */
+            resetImage() {
+                this.image.lineStyle(1, 0x9900CC)
+                    .moveTo(this.startPoint.x, this.startPoint.y)
+                    .lineTo(this.endPoint.x, this.endPoint.y);
+                var polyPts;
+                if (this.startPoint.x > this.endPoint.x) {
+                    polyPts = [this.startPoint.x - 5, this.startPoint.y - 5, this.startPoint.x + 5, this.startPoint.y + 5, this.endPoint.x + 5, this.endPoint.y + 5, this.endPoint.x - 5, this.endPoint.y - 5];
+                }
+                else if (this.startPoint.x < this.endPoint.x) {
+                    polyPts = [this.startPoint.x - 5, this.startPoint.y + 5, this.startPoint.x + 5, this.startPoint.y - 5, this.endPoint.x + 5, this.endPoint.y - 5, this.endPoint.x - 5, this.endPoint.y + 5];
+                }
+                else if (this.startPoint.x == this.endPoint.x) {
+                    polyPts = [this.startPoint.x - 5, this.startPoint.y, this.startPoint.x + 5, this.startPoint.y, this.endPoint.x + 5, this.endPoint.y, this.endPoint.x - 5, this.endPoint.y];
+                }
+                this.image.hitArea = new PIXI.Polygon(polyPts);
+                app.stage.addChild(this.image);
+                
+            }
+
+            /**
+             *  Calls all functions based around gathering information to have info datafields to hold 
+             *  current/new information to be used
+             */
+            fetchInformation() {
+                this.findDataPoints();
+                this.findPeakData();
+                this.findValleyData();
+                this.findPeak();
+                this.findBaseLine();
+            }//end of line details function
+
+            /**
+             * This function fetches and goes thru the info data fields and creates more images representing where measurements
+             * were taken.
+             */
+            displayDetails() {            
+                this.fetchInformation();
+                if (this.data != -1) {
+                    this.data.clear();
+                }
+                var changeY = this.endPoint.y - this.startPoint.y;
+                var changeX = this.endPoint.x - this.startPoint.x;
+                var entries = this.lineDataPoints.length;
+                var spaceX = changeX / entries;
+                var currentX = this.startPoint.x;
+                var spaceY = changeY / entries;
+                var currentY = this.startPoint.y;
+                const data = new PIXI.Graphics();
+                for (var i = 0; i <= entries; i++) {
+                    //Creates small squares denoting where measurements were taken
+                    data.beginFill(0x32CD32);
+                    data.lineStyle(1, 0x4169E1, 1);
+                    data.drawRect(currentX - 2, currentY - 2, 4, 4);
+                    data.endFill();
+                    app.stage.addChild(data);
+                    //Increments coordinates
+                    currentX += spaceX;
+                    currentY += spaceY;
+                }//end loop
+                this.data = data;
+                this.startPoint.clearImage();
+                this.startPoint.resetImage();
+                this.endPoint.clearImage();
+                this.endPoint.resetImage();
+            }
+            
+
+        }
+
+	    let type = "WebGL"
+	    if(!PIXI.utils.isWebGLSupported()){
+	        type = "canvas"
+        }
+        let app = new PIXI.Application({
+            width: window.innerWidth,         // default: 800
+            height: window.innerHeight,        // default: 600
+            antialias: true,    // default: false
+            transparent: false, // default: false
+            //			resolution: 1       // default: 1
+            autoResize: true,
+            resolution: devicePixelRatio
+        }
+        );
+        document.body.appendChild(app.view);
+
+        //Preloads images used
+        app.loader.add('t1', 'images/sinteredMetal.png');
+        app.loader.add('t2', 'images/cancel_icon.png');
+        app.loader.add('t3', 'images/line_tool_icon.png');
+        app.loader.add('t4', 'images/Picture1.png');
+        app.loader.add('t5', 'images/eraser_icon.png');
+        app.loader.add('t6', 'images/edit_tool_icon.png');
+        app.loader.add('t7', 'images/clear_all_icon.png');
+        app.loader.add('t8', 'images/next_icon.png');
+        app.loader.add('t9', 'images/previous_icon.png');
+        app.loader.load(setup);
+        
+        //After loading setup occurs
+        function setup(loader, resources) {
+            // create a background...
+            //Sets to match app size
+            //TODO: Should add the functionality of resizing as app resizes
+            const background = PIXI.Sprite.from(resources.t4.texture);
+            app.stage.addChild(background);
+            background.width = app.screen.width;
+            background.height = app.screen.height;
+
+           
+
+            var button_commands = [];
+
+            //Cancel button is used to end line drawing process prematurely
+            //Will appear once first point has been added
+            //Clicking on it resets all values like starting point, text, etc....
+            const cancel_button = new PIXI.Sprite.from(resources.t2.texture);
+            app.stage.addChild(cancel_button);
+            cancel_button.width = 50;
+            cancel_button.height = 50;
+            cancel_button.x = 0;
+            cancel_button.y = 0; 
+            cancel_button.alpha = 0;
+            cancel_button.interactive = true;
+            cancel_button.on('pointerdown', cancelDown);
+            cancel_button.on('pointerup', cancelUp);
+            cancel_button.on('pointerupoutside', cancelOutSide);
+
+            const draw_button = new PIXI.Sprite.from(resources.t3.texture);
+            app.stage.addChild(draw_button);
+            draw_button.width = 50;
+            draw_button.height = 50;
+            draw_button.x = 0;
+            draw_button.y = 0; 
+           // draw_button.alpha = 0;
+            draw_button.interactive = true;
+            draw_button.on('pointerdown', activateDraw);
+            draw_button.on('pointerup', activateUp);
+            //Value used to determine if user clicked on cancel button
+            button_commands.push(draw_button);
+            let cancel = false;
+
+            const edit_button = new PIXI.Sprite.from(resources.t6.texture);
+            app.stage.addChild(edit_button);
+            edit_button.width = 50;
+            edit_button.height = 50;
+            edit_button.x = 50;
+            edit_button.y = 0;
+            edit_button.interactive = true;
+            edit_button.on('pointerdown', editDown);
+            edit_button.on('pointerup', editUp);
+            button_commands.push(edit_button);
+
+            const eraser_button = new PIXI.Sprite.from(resources.t5.texture);
+            app.stage.addChild(eraser_button);
+            eraser_button.width = 50;
+            eraser_button.height = 50;
+            eraser_button.x = 100;
+            eraser_button.y = 0;
+            eraser_button.interactive = true;
+            eraser_button.on('pointerdown', eraseDown);
+            eraser_button.on('pointerup', eraseUp);
+            button_commands.push(eraser_button);
+
+            const clear_button = new  PIXI.Sprite.from(resources.t7.texture);
+            app.stage.addChild(clear_button);
+            clear_button.width = 50;
+            clear_button.height = 50;
+            clear_button.x = 150;
+            clear_button.y = 0;
+            clear_button.interactive = true; 
+            clear_button.on('pointerdown', clearDown);
+            clear_button.on('pointerup', clearUp);
+            button_commands.push(clear_button);
+
+            const next_button = new PIXI.Sprite.from(resources.t8.texture);
+            app.stage.addChild(next_button);
+            next_button.width = 50;
+            next_button.height = 50;
+            next_button.x = app.screen.width - 50;
+            next_button.y = app.screen.height - 50;
+            next_button.interactive = true;
+            next_button.buttonMode = true;
+            next_button.on('pointerdown', hideAll);
+
+            const previous_button = new PIXI.Sprite.from(resources.t9.texture);
+            app.stage.addChild(previous_button);
+            previous_button.width = 50;
+            previous_button.height = 50;
+            previous_button.x = app.screen.width - 100;
+            previous_button.y = app.screen.height - 50;
+            previous_button.alpha = 0;
+            previous_button.on('pointerdown', showAll);
+
+            
+
+            /*
+             * States:
+             * Neutral
+             * Drawing (line creation)
+             * Eraser
+             * */
+            
+            let state = 'neutral';
+
+
+            //Creates style used by text. It is currently unnecessary but more of an example
+            const style = new PIXI.TextStyle({
+                fontFamily: 'Arial',
+                fontSize: 36,
+                fontStyle: 'italic',
+                fontWeight: 'bold',
+                fill: ['#ffffff', '#00ff99'], // gradient
+                align: 'center',
+                stroke: '#4a1850',
+                strokeThickness: 5,
+                dropShadow: true,
+                dropShadowColor: '#000000',
+                dropShadowBlur: 4,
+                dropShadowAngle: Math.PI / 6,
+                dropShadowDistance: 6,
+                wordWrap: true,
+                wordWrapWidth: 500,
+            });
+            //Text style for information concerning line data
+            const lumStyle = new PIXI.TextStyle({
+                fontFamily: 'Arial',
+                fontSize: 12,
+                fontStyle: 'italic',
+                fontWeight: 'bold',
+                fill: ['#ffffff', '#C70039'], // gradient
+                align: 'center',
+                stroke: '#4a1850',
+                strokeThickness: 5,
+                dropShadow: true,
+                dropShadowColor: '#000000',
+                dropShadowBlur: 4,
+                dropShadowAngle: Math.PI / 6,
+                dropShadowDistance: 6,
+                wordWrap: true,
+                wordWrapWidth: 500,
+            });
+            //Text style for words appearing on graph
+            const graphText = new PIXI.TextStyle({
+                fontFamily: 'Arial',
+                fontSize: 7,
+                align: 'center',
+            });
+
+            //Tells user how to use application
+            //Text will change along with process
+            const richText = new PIXI.Text('', style);
+            richText.x = app.screen.width/2 - 250;
+            richText.y = 0;
+            app.stage.addChild(richText);
+            //Some constants initialized here to be used later
+            //Slope text is used to show details about the line drawn
+            const slopeText = new PIXI.Text('', lumStyle);
+            //Graphics concern the line itself
+            const graphics = new PIXI.Graphics();
+            //Graphs deals with the actual graph drawn as a result to the line data
+            const graphs = new PIXI.Graphics();
+            graphs.buttonMode = true;
+            graphs.interactive = true;
+            graphs
+                .on('pointerdown', onDragGraphStart)
+                .on('pointerup', onDragGraphEnd)
+                .on('pointerupoutside', onDragGraphEnd)
+                .on('pointermove', onDragGraphMove);
+            var boundary_tlx = app.screen.width / 2;
+            var boundary_tly = app.screen.height / 2;
+            var boundaryWidth = 500;
+            var boundaryHeight = 300;
+            //This container will hold all the horizontal graph text
+            const hTextContainer = new PIXI.Container(); 
+            app.stage.addChild(hTextContainer);
+            //This container will hold all the vertical graph text
+            const vTextContainer = new PIXI.Container();    
+            app.stage.addChild(vTextContainer);
+
+            //This determines whether a line is currently being drawn
+            //is used in the draw point function
+            let drawing = false;
+            //Variable used to hold starting point for the line
+           // var points = [0, 0];
+            var currentStart = -1;
+            var currentLine = -1;
+            var lines = [];
+            var points = [];
+
+           //Sets the app to be interactable and allows drawPoint function to be called
+            //When user clicks anywhere on screen
+            app.stage.interactive = true;
+            app.stage.on('pointerdown', drawPoint);
+
+            function showAll() {
+                state = 'nuetral';
+                showButtons();
+                richText.alpha = 1;
+                next_button.alpha = 1;
+                next_button.interactive = true;
+                next_button.buttonMode = true;
+                previous_button.alpha = 0;
+                previous_button.interactive = false;
+                previous_button.buttonMode = false;
+            }
+
+            function hideAll() {
+                state = 'nuetral';
+                clearUp();
+                for (var i = 0; i < button_commands.length; i++) {
+                    button_commands[i].alpha = 0;
+                    button_commands[i].interactive = false;
+                    button_commands[i].buttonMode = false;
+                }
+                cancel_button.alpha = 0;
+                cancel_button.interactive = false;
+                cancel_button.buttonMode = false;
+                next_button.alpha = 0;
+                next_button.interactive = false;
+                next_button.buttonMode = false;
+                previous_button.alpha = 1;
+                previous_button.interactive = true;
+                previous_button.buttonMode = true;
+                richText.alpha = 0;
+            }
+
+
+
+
+
+            /**
+            * Used to simplify the process of changing the main text but taking in a number which will
+             * dictate what will be shown as a result. This helps in changing states from neutral to drawing for example
+             * @param flag the integer parameter that dicates what text will be shown
+             */
+            function setMainText(flag) {
+                if (flag == 0) {
+                    var text = 0;
+                    if (currentLine != -1) {
+                        text = currentLine.name;
+                    }
+                    if (lines.length == 0) {
+                        richText.text = 'You currently have 0 lines.';
+                    }
+                    else {
+                        richText.text = 'You currently have ' + lines.length + ' Line(s) and the current entry is line ' + text + '.';
+                    }
+                }
+                else if (flag == 1) {
+                    richText.text = 'Make a starting point for your line by clicking on the screen';
+                }
+                else if (flag == 2) {
+                    richText.text = 'Create an end point by clicking somewhere else.';
+                }
+                else if (flag == 3) {
+                    richText.text = 'Choose a line to delete.';
+                }
+                else if (flag == 4) {
+                    richText.text = 'Pick a point or line to move.';
+                }
+                app.stage.addChild(richText);
+            }
+
+            /**
+             * Once activating one of the command buttons they will all be hidden to reveal the cancel button
+             * This function provides that process but setting all the command buttons alpha values to zero and bringing the
+             * cancel button to the front to allow users to click on it.
+             */
+            function hideButtons() {
+                for (var i = 0; i < button_commands.length; i++) {
+                    button_commands[i].alpha = 0;
+                    button_commands[i].interactive = false;
+                    button_commands[i].buttonMode = false;
+                }
+                cancel_button.alpha = 1;
+                bringToFront(cancel_button);
+            }
+
+            /**
+             * This simply does the opposite of hideButtons by revealing and bringing all command buttons to the front 
+             * while hiding the cancel button.
+             */
+            function showButtons() {
+                for (var i = 0; i < button_commands.length; i++) {
+                    button_commands[i].alpha = 1;
+                    button_commands[i].interactive = true;
+                    button_commands[i].buttonMode = true;
+                    bringToFront(button_commands[i]);
+                }
+                cancel_button.alpha = 0;
+            }
+
+            /**
+             * In situations where you may have images place on top of one another this will help bring those behind
+             * into the front. This occurs by finding the parent of the given image, then the image is removed and then readded 
+             * to the parent which effectivelyplaces the image on top of everything else.
+             * @param image the sprite/graphic/etc that needs to be brought to the front
+             */
+            function bringToFront(image) {
+                if (image.parent) {
+                    var parent = image.parent;
+                    parent.removeChild(image);
+                    parent.addChild(image);
+                }
+            }
+
+            /**
+             * Draw point allows the user to place a point on the image
+             * The first time the user does this the line drawing process will begin and drawing switches to true
+             * The starting point will be displayed by a small square and the app will wait for the user to
+             * click on the screen again
+             * Once activated again the app will denonte the end point of the user's line and create a straight
+             * line inbetween both points. This will then create a new line object which will have its details
+             * displayed and a graph will be created with its information.
+             */
+            function drawPoint(event) {
+                
+                if (state == 'drawing') { //Checks if in desired state
+                    if (!cancel) {  //Checks if user clicked on cancel button
+                        if (!drawing) { //Checks what phase of line create user is in
+                            graphics.clear(); //Clears current graphics on screen
+                            //Changes drawing value 
+                            drawing = true;
+                            //Updates starting point
+                          //  points = [event.data.global.x, event.data.global.y];
+                            //Creates the starting point for the line
+                            currentStart = new Point(event.data.global.x, event.data.global.y);
+                            currentStart.image.name = points.length;
+
+                            points.push(currentStart);
+                            //Updates text and cancel button
+                            setMainText(2);
+                        }//end drawing if
+                        else {
+                            //Creates the end point of the line
+                            var endPoint = new Point(event.data.global.x, event.data.global.y);
+                            endPoint.image.name = points.length;
+                            points.push(endPoint);
+                            //Contructs the line graphic to be place inside the line object
+                            var lineImage = new PIXI.Graphics();
+                            lineImage.lineStyle(1, 0x9900CC)
+                                .moveTo(currentStart.x, currentStart.y)
+                                .lineTo(endPoint.x, endPoint.y);
+                            lineImage.name = lines.length;
+                            lineImage.interactive = true;
+                            lineImage.buttonMode = true;
+                            lineImage
+                                .on('pointerdown', lineSelect)
+                                .on('pointerup', onDragLineEnd)
+                                .on('pointerupoutside', onDragLineEnd)
+                                .on('pointermove', onDragLineMove);
+                            //Creates the hit area of said line graphic
+                            var polyPts;
+                            if (currentStart.x > endPoint.x) {
+                                polyPts = [currentStart.x - 5, currentStart.y - 5, currentStart.x + 5, currentStart.y + 5, endPoint.x + 5, endPoint.y + 5, endPoint.x - 5, endPoint.y - 5];
+                            }
+                            else if (currentStart.x < endPoint.x) {
+                                polyPts = [currentStart.x - 5, currentStart.y + 5, currentStart.x + 5, currentStart.y - 5, endPoint.x + 5, endPoint.y - 5, endPoint.x - 5, endPoint.y + 5];
+                            }
+                            else if (currentStart.x == endPoint.x){
+                                polyPts = [currentStart.x - 5, currentStart.y, currentStart.x + 5, currentStart.y, endPoint.x + 5, endPoint.y, endPoint.x - 5, endPoint.y];
+                            }
+                            //Used to show hitarea for testing purposes
+                           // var pGraphic = new PIXI.Graphics();
+                     //       pGraphic.beginFill(0x1C2833);
+                       //     pGraphic.drawPolygon(polyPts);
+                         //   app.stage.addChild(pGraphic);
+                            lineImage.hitArea = new PIXI.Polygon(polyPts);
+                            app.stage.addChild(lineImage);
+                            //contructs line object
+                            currentStart.image
+                                .on('pointerdown', onDragStart)
+                                .on('pointerup', onDragEnd)
+                                .on('pointerupoutside', onDragEnd)
+                                .on('pointermove', onDragMove);
+                            endPoint.image
+                                .on('pointerdown', onDragStart)
+                                .on('pointerup', onDragEnd)
+                                .on('pointerupoutside', onDragEnd)
+                                .on('pointermove', onDragMove);
+                            currentLine = new Line(currentStart, endPoint, background, lines.length,lineImage);
+                            //Calls data functions to show user the results on the line they drew
+                            currentLine.displayDetails();   //Displays the details of the line by fetching its information 
+                            createGraph(currentLine);   //Creates a graph from said line
+                            lines.push(currentLine);    //Adds this line to the area of lines
+                            drawing = false;    //Ends the drawing state
+                            endDraw();
+                            
+                        }//end else
+                    }//end cancel if
+                }// end active if
+                
+            }// end draw point
+
+            /**
+             * As of now this doesn't do anything but it can be used to show a pressed button animation 
+             * @param event
+             */
+            function activateDraw(event) {
+                //  cancel_button.texture = resources.t2.texture
+                if (this.alpha == 1) {
+                    //show animated button press????
+
+                    
+                }
+            }
+
+            /**
+             * This function actually starts the drawing state by changing the main text, hidding the command buttons
+             * and setting active to true and state to drawing.
+             * @param event
+             */
+            function activateUp(event) {
+                if (this.alpha == 1) {
+                    setMainText(1);
+                    hideButtons();
+                    active = true;
+                    state = 'drawing';
+                }
+            }
+
+            /**
+             * End Draw is used to move from the drawing state to the neutral state whether by actually making a line or
+             * by canceling the state prematurely.
+             */
+            function endDraw() {
+                drawing = false;
+                active = false;
+                state = 'neutral';
+                showButtons();
+              //  points = [0, 0];
+                currentStart = -1;
+                setMainText(0);
+            }
+
+            /**
+             * This function is called when the user clicks on the cancel button.
+             * The contents of this function won't run unless the button is clearly visible to the user.
+             * Pressing down on the button will prevent the user from creating/doing anything for the
+             * current state like erase or draw. However this doesn't activate the transfer of states.
+             * This is to allow the user to change their mind by releasing outside the button.
+             * @param event the action of clicking on the cancel button sprite
+             */
+            function cancelDown(event) {
+                cancel = true;
+            }// end cancel draw
+
+            /**
+             * This is to undo the contents of cancel down without actually changing states
+             * @param event
+             */
+            function cancelOutSide(event) {
+                cancel = false;
+            }
+
+            /**
+             * When releasing click/press/etc ontop of the cancel button this will prematurely exit
+             * the current state back into neutral. So if the current user is drawing the line they were working on will 
+             * get destroyed and so on.
+             * 
+             */
+            function cancelUp(event) {
+                //Resets cancel value
+                if (cancel) { 
+                    if (state == 'drawing') {
+                        graphics.clear();
+                        graphs.clear();
+                        graphs.removeChildren();
+                        hTextContainer.removeChildren();
+                        vTextContainer.removeChildren();
+                        showButtons();
+                        // points = [];
+                        cancel = false;
+                        drawing = false;
+                        active = false;
+                        state = 'neutral';
+                        setMainText(0);
+                        slopeText.text = '';
+                        currentStart.clearImage();
+                        if (currentStart != -1) {
+                            erasePoint(currentStart);
+                        }
+                        currentStart = -1;
+                        endDraw();
+                    }
+                    else if (state == 'erase') {
+                        showButtons();
+                        cancel = false;
+                        state = 'neutral';
+                        setMainText(0);
+                    }
+                    else if (state == 'edit') {
+                        showButtons();
+                        cancel = false;
+                        state = 'neutral';
+                        setMainText(0);
+                    }
+                }
+            }//end cancel up
+
+            /**
+             * Similar situation to draw down so this could be used to activate a pressed down animation
+             */
+            function eraseDown() {
+
+            }
+
+            /**
+             * When releasing this actually changes the state to erase and changes the main text
+             * and hides the command buttons. This only occurs if the erase icon is visible.
+             */
+            function eraseUp() {
+                if (this.alpha == 1) {
+                    setMainText(3);
+                    hideButtons();
+                    state = 'erase';
+                }
+
+            }
+
+            /**
+             * This is the process to actually remove a line from the screen. We first take the line's index
+             * to allow us to remove said line from our list of lines. We must then reset all the names/indices 
+             * held within the line objects themselves to prevent future confusion. If the current line being displayed
+             * by the graph is the one being deleted then the graph must also be removed. Then we used the line object
+             * function of removeLine to get clear off all the images associated with this line object.
+             * 
+             * @param line the line object to be removed 
+             */
+            function eraseLine(line) {
+                var index = line.name;
+                lines.splice(index, 1);
+                for (var i = 0; i < lines.length; i++) {
+                    lines[i].name = i;
+                    lines[i].image.name = i;
+                }
+                if (line == currentLine) {
+                    graphs.clear();
+                    graphs.removeChildren();
+                    graphics.clear();
+                    hTextContainer.removeChildren();
+                    vTextContainer.removeChildren();
+                    currentLine = -1;
+                }
+                line.removeLine();
+                erasePoint(this.startPoint);
+                erasePoint(this.endPoint);
+            }
+
+            function erasePoint(point) {
+                var index = point.image.name;
+                points.splice(index, 1);
+                for (var i = 0; i < points.length; i++) {
+                    //points[i].name = i;
+                    points[i].image.name = i;
+                }
+                point.clearImage();
+            }
+
+            /**
+             * Similar situation to draw down so this could be used to activate a pressed down animation
+             */
+            function editDown() {
+
+            }
+
+            /**
+             * When releasing this actually changes the state to erase and changes the main text
+             * and hides the command buttons. This only occurs if the erase icon is visible.
+             */
+            function editUp() {
+                if (this.alpha == 1) {
+                    setMainText(4);
+                    hideButtons();
+                    state = 'edit';
+                }
+            }
+
+            //Drag point functions
+            function onDragStart(event) {
+                if (state == 'edit') { 
+                    // store a reference to the data
+                    // the reason for this is because of multitouch
+                    // we want to track the movement of this particular touch
+                    this.data = event.data;
+                    this.alpha = 0.5;
+                 //   richText.text = this.name;
+                    points[this.name].owner.image.alpha = 0.5;
+                    points[this.name].owner.data.alpha = 0.5;
+                    points[this.name].owner.clearImage();
+                    points[this.name].owner.resetImage();
+                    if (currentLine != points[this.name].owner) {
+                        currentLine = points[this.name].owner;
+                        createGraph(currentLine);
+                    }
+                    this.dragging = true;
+                }
+            }
+            function onDragEnd() {
+                if (state == 'edit') {
+                    this.alpha = 1;
+                    points[this.name].owner.image.alpha = 1;
+                    points[this.name].owner.data.alpha = 1;
+                    points[this.name].owner.displayDetails();
+                    createGraph(currentLine);
+                    this.dragging = false;
+                    // set the interaction data to null
+                    this.data = null;
+                }
+            }
+            function onDragMove() {
+                if (state == 'edit') { 
+                    if (this.dragging) {
+                        const newPosition = this.data.getLocalPosition(this.parent);
+                        var changeX = newPosition.x;
+                        var changeY = newPosition.y;
+
+                        if (newPosition.x < 0) {
+                            changeX = 0;
+                        }
+                        else if (newPosition.x >= app.screen.width) {
+                            changeX = app.screen.width;
+                        }
+
+                        if (newPosition.y < 0) {
+                            changeY = 0;
+                        }
+                        else if (newPosition.y >= app.screen.height) {
+                            changeY = app.screen.height;
+                        }
+                        points[this.name].changeLocation(changeX, changeY);
+                        points[this.name].owner.clearImage();
+                        points[this.name].owner.resetImage();
+                    }
+                }
+            }
+
+            //Drag line
+            function onDragLineEnd() {
+                if (state == 'edit') {
+                
+                    this.alpha = 1;
+                    lines[this.name].clearImage();
+                    lines[this.name].resetImage();
+                    lines[this.name].startPoint.image.alpha = 1;
+                   // lines[this.name].startPoint.resetImage();
+                    lines[this.name].endPoint.image.alpha = 1;
+                   // lines[this.name].endPoint.resetImage();
+                    lines[this.name].displayDetails();
+                    this.dragging = false;
+                    createGraph(currentLine);
+                    this.eventData = null;
+                }
+            }
+            function onDragLineMove() {
+                if (state == 'edit') {
+                    if (this.dragging) {
+                        const newPosition = this.eventData.getLocalPosition(this.parent);
+                        var move = true;
+                        var changeX = newPosition.x - this.dragx;
+                        var changeY = newPosition.y - this.dragy;
+
+                        if (lines[this.name].startPoint.x + changeX < 0) {
+                            changeX = 0 - lines[this.name].startPoint.x;
+                        }
+                        else if (lines[this.name].endPoint.x + changeX < 0) {
+                            changeX = 0 - lines[this.name].endPoint.x;
+                        }
+                        else if (lines[this.name].startPoint.x + changeX >= app.screen.width) {
+                            changeX = app.screen.width - (lines[this.name].startPoint.x);
+                        }
+                        else if (lines[this.name].endPoint.x + changeX >= app.screen.width) {
+                            changeX = app.screen.width - (lines[this.name].endPoint.x);
+                        }
+
+                        if (lines[this.name].startPoint.y + changeY < 0) {
+                            changeY = 0 - lines[this.name].startPoint.y;
+                        }
+                        else if (lines[this.name].endPoint.Y + changeY < 0) {
+                            changeY = 0 - lines[this.name].endPoint.Y;
+
+                        }
+                        else if (lines[this.name].startPoint.y + changeY >= app.screen.height) {
+                            changeY = app.screen.height - (lines[this.name].startPoint.y);
+
+                        }
+                        else if (lines[this.name].endPoint.y + changeY >= app.screen.height) {
+                            changeY = app.screen.height - (lines[this.name].endPoint.y);
+                        }
+                        
+                        if (move) {
+                            lines[this.name].startPoint.changeLocation(lines[this.name].startPoint.x + changeX, lines[this.name].startPoint.y + changeY);
+                            lines[this.name].endPoint.changeLocation(lines[this.name].endPoint.x + changeX, lines[this.name].endPoint.y + changeY);
+                            this.dragx = newPosition.x;
+                            this.dragy = newPosition.y;
+                            lines[this.name].clearImage();
+                            lines[this.name].resetImage();
+                        }
+                    }
+                }
+            }
+
+            //drag graph
+            function onDragGraphStart(event) {
+                if (state == 'edit') {
+                    this.data = event.data;
+                    this.alpha = 0.5;
+                    this.dragging = true;
+                    this.dragx = event.data.global.x;
+                    this.dragy = event.data.global.y;
+                }
+            }
+            function onDragGraphEnd() {
+                if (state == 'edit') {
+                    this.alpha = 1;
+                    this.dragging = false;
+                    this.data = null;
+                }
+            }
+            function onDragGraphMove() {
+                if (state == 'edit') {
+                    if (this.dragging) {
+                        const newPosition = this.data.getLocalPosition(this.parent);
+                        var changeX = newPosition.x - this.dragx;
+                        var changeY = newPosition.y - this.dragy;
+                        richText.text = 'boundary X: ' + boundary_tlx + ' boundary Y: ' + boundary_tly;
+                        if (boundary_tlx + changeX < 0) {
+                            changeX = 0 - boundary_tlx;
+                        }
+                        else if (boundary_tlx + boundaryWidth + changeX >= app.screen.width) {
+                            changeX = app.screen.width - (boundary_tlx + boundaryWidth);
+                        }
+
+                        if (boundary_tly + changeY < 0) {
+                            changeY = 0 - boundary_tly;
+                        }
+                        else if (boundary_tly + boundaryHeight + changeY >= app.screen.height) {
+                            changeY = app.screen.height - (boundary_tly + boundaryHeight);
+                        }
+                        moveChildren(graphs, changeX, changeY);
+                        moveChildren(hTextContainer, changeX, changeY);
+                        moveChildren(vTextContainer, changeX, changeY);
+                        this.dragy = newPosition.y;
+                        this.dragx = newPosition.x;
+                        boundary_tlx += changeX;
+                        boundary_tly += changeY;
+                    }
+                }
+            }
+
+            function moveChildren(container, changeX, changeY) {
+                var length = container.children.length;
+                for (var i = 0; i < length; i++) {
+                    var child = container.getChildAt(i);
+                    child.x += changeX;
+                    child.y += changeY;
+                }
+            }
+            function clearDown() {
+
+            }
+
+            /**
+             * When releasing this actually changes the state to erase and changes the main text
+             * and hides the command buttons. This only occurs if the erase icon is visible.
+             */
+            function clearUp() {
+                //if (this.alpha == 1) {
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i];
+                        if (line == currentLine) {
+                            graphs.clear();
+                            graphs.removeChildren();
+
+                            graphics.clear();
+                            hTextContainer.removeChildren();
+                            vTextContainer.removeChildren();
+                            currentLine = -1;
+                        }
+                        line.removeLine();
+                        erasePoint(line.startPoint);
+                        erasePoint(line.endPoint);
+                    }
+                    lines = [];
+                    setMainText(0);
+              //  }
+            }
+
+            /**
+             * When a user clicks on a line that line will call this function which will decide on what to do 
+             * depending on the current state of the application.
+             * @param line the line that was selected by the user
+             */
+            function lineSelect(event){
+                if (state == 'neutral') {   //Will display the information of said line
+                    currentLine = lines[this.name];
+                    createGraph(lines[this.name]);
+                    setMainText(0);
+                }
+                else if (state == 'erase') {    //Will delete said line
+                    eraseLine(lines[this.name]);
+                }
+                else if (state == 'edit') {    //Will delete said line
+                    this.alpha = 0.5;
+                    lines[this.name].clearImage();
+                    lines[this.name].resetImage();
+                    lines[this.name].startPoint.image.alpha = 0.5;
+                    lines[this.name].endPoint.image.alpha = 0.5;
+                    if (currentLine != lines[this.name]) {
+                        currentLine = lines[this.name];
+                        createGraph(currentLine);
+                    }
+                    this.dragging = true;
+                    this.eventData = event.data;
+                    this.dragx = event.data.global.x;
+                    this.dragy = event.data.global.y;
+                }
+            }
+
+            /**
+             * The create graph function contructs the visual representation of the data collected by the line
+             * details function. A graph is handmade using rectangles, lines and text. The sizes 
+             * are arbitrary for now and can be changed later on. As of now the graph has a specfic
+             * size and position that it sticks to.
+             * @param line the line object to extract information from
+             */
+            function createGraph(line) {
+                //Resets graph related visuals
+                
+                graphs.clear();
+                graphs.removeChildren();
+                hTextContainer.removeChildren();
+                vTextContainer.removeChildren();
+
+                //Create a rectangle
+                //Outside boundary 
+                
+                var outsideBoundary = new PIXI.Graphics();
+                outsideBoundary.lineStyle(1, 0x000000, 1);
+                outsideBoundary.beginFill(0xffffff);
+                outsideBoundary.drawRect(boundary_tlx, boundary_tly, boundaryWidth, boundaryHeight);
+                outsideBoundary.endFill();
+                var polyPts;
+                polyPts = [boundary_tlx, boundary_tly, boundary_tlx, boundary_tly + boundaryHeight, boundary_tlx + boundaryWidth, boundary_tly + boundaryHeight, boundary_tlx + boundaryWidth, boundary_tly];
+                outsideBoundary.hitArea = new PIXI.Polygon(polyPts);
+                graphs.addChild(outsideBoundary);
+
+                //Inner graph
+                var innerGraph = new PIXI.Graphics();
+                var graph_tlx = boundary_tlx + 50;
+                var graph_tly = boundary_tly + 25;
+                var graphWidth = 425;
+                var graphHeight = 225;
+                innerGraph.lineStyle(1, 0x000000, 1);
+                innerGraph.beginFill(0xffffff);
+                innerGraph.drawRect(graph_tlx, graph_tly, graphWidth, graphHeight);
+                innerGraph.endFill();
+                graphs.addChild(innerGraph);
+
+                //This takes care of the horizontal segements of the graph
+                var horizontalColumns = 10;
+                var horizontalHalfSpacing = graphWidth / (horizontalColumns * 2);    //Spacing between each noted index
+                var horizontalDashY = graph_tly + graphHeight;      //Starting point for everything (Bottom of graph)
+                var horizontalDashX = graph_tlx;        //Left hand side
+                var currentX = horizontalDashX + horizontalHalfSpacing;     //Off sets the first element
+                
+                var horizontalText = [];   //Text to be used
+                for (var i = 0; i <= horizontalColumns; i++) {
+                    horizontalText.push(Math.floor((line.lineDataPoints.length / 10) * i));
+                }
+                for (var i = 0; i < horizontalColumns; i++) {
+                    var indexLine = new PIXI.Graphics();
+                    indexLine.lineStyle(1, 0x000000)               //Creates a line to indicate the index
+                        .moveTo(currentX, horizontalDashY - 5)
+                        .lineTo(currentX, horizontalDashY + 5);
+                    graphs.addChild(indexLine);
+
+                    const hText = new PIXI.Text(horizontalText[i], graphText);  //Adds text underneath it
+                    hText.x = currentX - hText.width/2;
+                    hText.y = horizontalDashY + 10;
+                    hTextContainer.addChild(hText);
+
+                    var backgroundLine = new PIXI.Graphics();
+                    backgroundLine.lineStyle(1, 0x33FFFC)               //Creates the background lines for the graph
+                        .moveTo(currentX, horizontalDashY - graphHeight)
+                        .lineTo(currentX, horizontalDashY);
+                    graphs.addChild(backgroundLine);
+
+                    currentX += 2 * horizontalHalfSpacing;
+                }
+
+                //This takes care of the vertical segements of the graph
+                var verticalRows = 15;
+                if (line.valueDifference < verticalRows) {
+                    verticalRows = line.valueDifference;
+                }
+                var verticalSpacing = graphHeight / verticalRows;
+                var verticalDashY = graph_tly + graphHeight;
+                var verticalDashX = graph_tlx;
+                var currentY = verticalDashY;
+               // var verticalText = ["51", "102", "153", "204", "255"];
+                var verticalText = [];
+                var verticalValueSpacing = line.valueDifference / verticalRows;
+                var counter = 0;
+                for (var i = 0; i <= verticalRows; i++) {
+                    verticalText.push(Math.floor(counter));
+                    counter += verticalValueSpacing;
+                }
+
+                for (var i = 0; i <= verticalRows; i++) {
+                    const vText = new PIXI.Text(verticalText[i], graphText);
+                    vText.x = verticalDashX - 20;
+                    var vIndexLine = new PIXI.Graphics();
+                    vIndexLine.lineStyle(1, 0x000000)       //Vertical entry index
+                        .moveTo(verticalDashX - 5, currentY)
+                        .lineTo(verticalDashX, currentY);
+                    graphs.addChild(vIndexLine);
+
+                    if (i != 0) {
+                        var vBackgroundLine = new PIXI.Graphics();
+                        vBackgroundLine.lineStyle(1, 0x33FFFC)   //Background lines
+                            .moveTo(verticalDashX, currentY)
+                            .lineTo(verticalDashX + graphWidth, currentY);
+                        graphs.addChild(vBackgroundLine);
+                    }
+                    vText.y = currentY - (vText.height) / 2;
+                    vTextContainer.addChild(vText);
+                    currentY -= verticalSpacing;
+                }
+
+
+                //This plots the actual data of the graph 
+                
+                var arrayLength = line.lineDataPoints.length; //used for loop bounds
+                var valueSpacing = graphHeight / line.valueDifference;   //finds pixel length of each individual y value (y-axis)
+                var entrySpacing = (graphWidth - (horizontalHalfSpacing * 2)) / arrayLength;    //Spacing between each entry (x-axis)
+                var entryStartY = graph_tly + graphHeight;      //Starting point for everything (Bottom of graph)
+                var entryStartX = graph_tlx + horizontalHalfSpacing;        //Left hand side
+                var entryCurrentX = entryStartX;
+                for (var i = 0; i < arrayLength; i++) {
+                    var peakCheck = false;
+                    var peakLength = line.peakData.length;
+                    for (var j = 0; j < peakLength; j++) {
+                        if (i == line.peakData[j]) {
+                            peakCheck = true;
+                            break;
+                        }//end if
+                    }//end for
+                    var valleyCheck = false;
+                    var valleyLength = line.valleyData.length;
+                    for (var j = 0; j < valleyLength; j++) {
+                        if (i == line.valleyData[j]) {
+                            valleyCheck = true;
+                            break;
+                        }//end if
+                    }//end for
+                    if (peakCheck) {
+                        slopeText.text += '\n' + 'Drawing peak at ' + i; //Used for testing not necessary
+
+                        var peakBar = new PIXI.Graphics();
+                        peakBar.lineStyle(2, 0x165F0A)               //Creates bar for the ith entry of the bar graph
+                            .moveTo(entryCurrentX - 1, entryStartY)
+                            .lineTo(entryCurrentX - 1, entryStartY - (valueSpacing * (line.lineDataPoints[i])));
+                        graphs.addChild(peakBar);
+                    }// end if
+                    else if (valleyCheck) {
+                        slopeText.text += '\n' + 'Drawing valley at ' + i; //Used for testing not necessary
+                        var valleyBar = new PIXI.Graphics();
+                        valleyBar.lineStyle(2, 0x0A175F)               //Creates bar for the ith entry of the bar graph
+                            .moveTo(entryCurrentX - 1, entryStartY)
+                            .lineTo(entryCurrentX - 1, graph_tly);
+                        graphs.addChild(valleyBar);
+                    }// end else if
+                    else {
+                        var entryBar = new PIXI.Graphics();
+                        entryBar.lineStyle(2, 0xC70039)               //Creates bar for the ith entry of the bar graph
+                            .moveTo(entryCurrentX - 1, entryStartY)
+                            .lineTo(entryCurrentX - 1, entryStartY - (valueSpacing * (line.lineDataPoints[i])));
+                        graphs.addChild(entryBar);
+                    }// end else
+                    entryCurrentX += entrySpacing;
+                }//end of for loop
+
+                //Draw baseline
+                var baslineImage = new PIXI.Graphics();
+                baslineImage.lineStyle(1, 0x4A235A)
+                    .moveTo(verticalDashX, entryStartY - (valueSpacing * (line.baseline)))
+                    .lineTo(verticalDashX + graphWidth, entryStartY - (valueSpacing * (line.baseline)));
+                graphs.addChild(baslineImage);
+
+                app.stage.addChild(graphs);
+                app.stage.addChild(vTextContainer);
+                app.stage.addChild(hTextContainer);
+
+
+
+            }//end of create graph
+
+        }// end setup
+
+    </script>
+</body>
+</html>
