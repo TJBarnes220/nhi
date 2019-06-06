@@ -27,13 +27,18 @@ canvas {
 </style>
 <body>
     <script src="pixi.min.js"></script>
+
     <script src="point.js"></script>
-    <script src="bringToFront.js"></script>
     <script src="line.js"></script>
-    <script type="text/javascript">	
-	    let type = "WebGL"
-	    if(!PIXI.utils.isWebGLSupported()){
-	        type = "canvas"
+    <script src="graphs.js"></script>
+
+    <script src="change_text.js"></script>
+    <script src="bring_to_front.js"></script>
+
+    <script type="text/javascript">
+        let type = "WebGL"
+        if (!PIXI.utils.isWebGLSupported()) {
+            type = "canvas"
         }
         let app = new PIXI.Application({
             width: window.innerWidth,         // default: 800
@@ -58,7 +63,7 @@ canvas {
         app.loader.add('t8', '../images/next_icon.png');
         app.loader.add('t9', '../images/previous_icon.png');
         app.loader.load(setup);
-        
+
         //After loading setup occurs
         function setup(loader, resources) {
             // create a background...
@@ -69,7 +74,7 @@ canvas {
             background.width = app.screen.width;
             background.height = app.screen.height;
 
-           
+
 
             var button_commands = [];
 
@@ -81,7 +86,7 @@ canvas {
             cancel_button.width = 50;
             cancel_button.height = 50;
             cancel_button.x = 0;
-            cancel_button.y = 0; 
+            cancel_button.y = 0;
             cancel_button.alpha = 0;
             cancel_button.interactive = true;
             cancel_button.on('pointerdown', cancelDown);
@@ -93,8 +98,8 @@ canvas {
             draw_button.width = 50;
             draw_button.height = 50;
             draw_button.x = 0;
-            draw_button.y = 0; 
-           // draw_button.alpha = 0;
+            draw_button.y = 0;
+            // draw_button.alpha = 0;
             draw_button.interactive = true;
             draw_button.on('pointerdown', activateDraw);
             draw_button.on('pointerup', activateUp);
@@ -124,13 +129,13 @@ canvas {
             eraser_button.on('pointerup', eraseUp);
             button_commands.push(eraser_button);
 
-            const clear_button = new  PIXI.Sprite.from(resources.t7.texture);
+            const clear_button = new PIXI.Sprite.from(resources.t7.texture);
             app.stage.addChild(clear_button);
             clear_button.width = 50;
             clear_button.height = 50;
             clear_button.x = 150;
             clear_button.y = 0;
-            clear_button.interactive = true; 
+            clear_button.interactive = true;
             clear_button.on('pointerdown', clearDown);
             clear_button.on('pointerup', clearUp);
             button_commands.push(clear_button);
@@ -154,7 +159,7 @@ canvas {
             previous_button.alpha = 0;
             previous_button.on('pointerdown', showAll);
 
-            
+
 
             /*
              * States:
@@ -162,7 +167,7 @@ canvas {
              * Drawing (line creation)
              * Eraser
              * */
-            
+
             let state = 'neutral';
 
 
@@ -202,22 +207,15 @@ canvas {
                 wordWrap: true,
                 wordWrapWidth: 500,
             });
-            //Text style for words appearing on graph
-            const graphText = new PIXI.TextStyle({
-                fontFamily: 'Arial',
-                fontSize: 7,
-                align: 'center',
-            });
+            
 
             //Tells user how to use application
             //Text will change along with process
             const richText = new PIXI.Text('', style);
-            richText.x = app.screen.width/2 - 250;
+            richText.x = app.screen.width / 2 - 250;
             richText.y = 0;
             app.stage.addChild(richText);
             //Some constants initialized here to be used later
-            //Slope text is used to show details about the line drawn
-            const slopeText = new PIXI.Text('', lumStyle);
             //Graphics concern the line itself
             const graphics = new PIXI.Graphics();
             //Graphs deals with the actual graph drawn as a result to the line data
@@ -229,28 +227,29 @@ canvas {
                 .on('pointerup', onDragGraphEnd)
                 .on('pointerupoutside', onDragGraphEnd)
                 .on('pointermove', onDragGraphMove);
+
             var boundary_tlx = app.screen.width / 2;
             var boundary_tly = app.screen.height / 2;
             var boundaryWidth = 500;
             var boundaryHeight = 300;
             //This container will hold all the horizontal graph text
-            const hTextContainer = new PIXI.Container(); 
+            const hTextContainer = new PIXI.Container();
             app.stage.addChild(hTextContainer);
             //This container will hold all the vertical graph text
-            const vTextContainer = new PIXI.Container();    
+            const vTextContainer = new PIXI.Container();
             app.stage.addChild(vTextContainer);
 
             //This determines whether a line is currently being drawn
             //is used in the draw point function
             let drawing = false;
             //Variable used to hold starting point for the line
-           // var points = [0, 0];
+            // var points = [0, 0];
             var currentStart = -1;
             var currentLine = -1;
             var lines = [];
             var points = [];
 
-           //Sets the app to be interactable and allows drawPoint function to be called
+            //Sets the app to be interactable and allows drawPoint function to be called
             //When user clicks anywhere on screen
             app.stage.interactive = true;
             app.stage.on('pointerdown', drawPoint);
@@ -291,38 +290,7 @@ canvas {
 
 
 
-            /**
-            * Used to simplify the process of changing the main text but taking in a number which will
-             * dictate what will be shown as a result. This helps in changing states from neutral to drawing for example
-             * @param flag the integer parameter that dicates what text will be shown
-             */
-            function setMainText(flag) {
-                if (flag == 0) {
-                    var text = 0;
-                    if (currentLine != -1) {
-                        text = currentLine.name;
-                    }
-                    if (lines.length == 0) {
-                        richText.text = 'You currently have 0 lines.';
-                    }
-                    else {
-                        richText.text = 'You currently have ' + lines.length + ' Line(s) and the current entry is line ' + text + '.';
-                    }
-                }
-                else if (flag == 1) {
-                    richText.text = 'Make a starting point for your line by clicking on the screen';
-                }
-                else if (flag == 2) {
-                    richText.text = 'Create an end point by clicking somewhere else.';
-                }
-                else if (flag == 3) {
-                    richText.text = 'Choose a line to delete.';
-                }
-                else if (flag == 4) {
-                    richText.text = 'Pick a point or line to move.';
-                }
-                app.stage.addChild(richText);
-            }
+
 
             /**
              * Once activating one of the command buttons they will all be hidden to reveal the cancel button
@@ -340,7 +308,7 @@ canvas {
             }
 
             /**
-             * This simply does the opposite of hideButtons by revealing and bringing all command buttons to the front 
+             * This simply does the opposite of hideButtons by revealing and bringing all command buttons to the front
              * while hiding the cancel button.
              */
             function showButtons() {
@@ -353,7 +321,7 @@ canvas {
                 cancel_button.alpha = 0;
             }
 
-            
+
 
             /**
              * Draw point allows the user to place a point on the image
@@ -365,22 +333,22 @@ canvas {
              * displayed and a graph will be created with its information.
              */
             function drawPoint(event) {
-                
+
                 if (state == 'drawing') { //Checks if in desired state
                     if (!cancel) {  //Checks if user clicked on cancel button
                         if (!drawing) { //Checks what phase of line create user is in
                             graphics.clear(); //Clears current graphics on screen
-                            //Changes drawing value 
+                            //Changes drawing value
                             drawing = true;
                             //Updates starting point
-                          //  points = [event.data.global.x, event.data.global.y];
+                            //  points = [event.data.global.x, event.data.global.y];
                             //Creates the starting point for the line
                             currentStart = new Point(event.data.global.x, event.data.global.y);
                             currentStart.image.name = points.length;
 
                             points.push(currentStart);
                             //Updates text and cancel button
-                            setMainText(2);
+                            setMainText(richText, 2, lines);
                         }//end drawing if
                         else {
                             //Creates the end point of the line
@@ -408,14 +376,14 @@ canvas {
                             else if (currentStart.x < endPoint.x) {
                                 polyPts = [currentStart.x - 5, currentStart.y + 5, currentStart.x + 5, currentStart.y - 5, endPoint.x + 5, endPoint.y - 5, endPoint.x - 5, endPoint.y + 5];
                             }
-                            else if (currentStart.x == endPoint.x){
+                            else if (currentStart.x == endPoint.x) {
                                 polyPts = [currentStart.x - 5, currentStart.y, currentStart.x + 5, currentStart.y, endPoint.x + 5, endPoint.y, endPoint.x - 5, endPoint.y];
                             }
                             //Used to show hitarea for testing purposes
-                           // var pGraphic = new PIXI.Graphics();
-                     //       pGraphic.beginFill(0x1C2833);
-                       //     pGraphic.drawPolygon(polyPts);
-                         //   app.stage.addChild(pGraphic);
+                            // var pGraphic = new PIXI.Graphics();
+                            //       pGraphic.beginFill(0x1C2833);
+                            //     pGraphic.drawPolygon(polyPts);
+                            //   app.stage.addChild(pGraphic);
                             lineImage.hitArea = new PIXI.Polygon(polyPts);
                             app.stage.addChild(lineImage);
                             //contructs line object
@@ -429,22 +397,24 @@ canvas {
                                 .on('pointerup', onDragEnd)
                                 .on('pointerupoutside', onDragEnd)
                                 .on('pointermove', onDragMove);
-                            currentLine = new Line(currentStart, endPoint, background, lines.length,lineImage);
+                            currentLine = new Line(currentStart, endPoint, background, lines.length, lineImage);
                             //Calls data functions to show user the results on the line they drew
-                            currentLine.displayDetails();   //Displays the details of the line by fetching its information 
-                            createGraph(currentLine);   //Creates a graph from said line
+                            currentLine.displayDetails();   //Displays the details of the line by fetching its information
+                           
+                            createGraph(graphs, currentLine, boundary_tlx, boundary_tly);  //Creates a graph from said line
+                            app.stage.addChild(graphs);
                             lines.push(currentLine);    //Adds this line to the area of lines
                             drawing = false;    //Ends the drawing state
                             endDraw();
-                            
+
                         }//end else
                     }//end cancel if
                 }// end active if
-                
+
             }// end draw point
 
             /**
-             * As of now this doesn't do anything but it can be used to show a pressed button animation 
+             * As of now this doesn't do anything but it can be used to show a pressed button animation
              * @param event
              */
             function activateDraw(event) {
@@ -452,7 +422,7 @@ canvas {
                 if (this.alpha == 1) {
                     //show animated button press????
 
-                    
+
                 }
             }
 
@@ -463,7 +433,7 @@ canvas {
              */
             function activateUp(event) {
                 if (this.alpha == 1) {
-                    setMainText(1);
+                    setMainText(richText, 1, lines);
                     hideButtons();
                     active = true;
                     state = 'drawing';
@@ -479,9 +449,9 @@ canvas {
                 active = false;
                 state = 'neutral';
                 showButtons();
-              //  points = [0, 0];
+                //  points = [0, 0];
                 currentStart = -1;
-                setMainText(0);
+                setMainText(richText, 0, lines);
             }
 
             /**
@@ -506,13 +476,13 @@ canvas {
 
             /**
              * When releasing click/press/etc ontop of the cancel button this will prematurely exit
-             * the current state back into neutral. So if the current user is drawing the line they were working on will 
+             * the current state back into neutral. So if the current user is drawing the line they were working on will
              * get destroyed and so on.
-             * 
+             *
              */
             function cancelUp(event) {
                 //Resets cancel value
-                if (cancel) { 
+                if (cancel) {
                     if (state == 'drawing') {
                         graphics.clear();
                         graphs.clear();
@@ -520,13 +490,11 @@ canvas {
                         hTextContainer.removeChildren();
                         vTextContainer.removeChildren();
                         showButtons();
-                        // points = [];
                         cancel = false;
                         drawing = false;
                         active = false;
                         state = 'neutral';
-                        setMainText(0);
-                        slopeText.text = '';
+                        setMainText(richText, 0, lines);
                         currentStart.clearImage();
                         if (currentStart != -1) {
                             erasePoint(currentStart);
@@ -538,13 +506,13 @@ canvas {
                         showButtons();
                         cancel = false;
                         state = 'neutral';
-                        setMainText(0);
+                        setMainText(richText, 0, lines);
                     }
                     else if (state == 'edit') {
                         showButtons();
                         cancel = false;
                         state = 'neutral';
-                        setMainText(0);
+                        setMainText(richText, 0, lines);
                     }
                 }
             }//end cancel up
@@ -562,7 +530,7 @@ canvas {
              */
             function eraseUp() {
                 if (this.alpha == 1) {
-                    setMainText(3);
+                    setMainText(richText, 3, lines);
                     hideButtons();
                     state = 'erase';
                 }
@@ -571,12 +539,12 @@ canvas {
 
             /**
              * This is the process to actually remove a line from the screen. We first take the line's index
-             * to allow us to remove said line from our list of lines. We must then reset all the names/indices 
+             * to allow us to remove said line from our list of lines. We must then reset all the names/indices
              * held within the line objects themselves to prevent future confusion. If the current line being displayed
              * by the graph is the one being deleted then the graph must also be removed. Then we used the line object
              * function of removeLine to get clear off all the images associated with this line object.
-             * 
-             * @param line the line object to be removed 
+             *
+             * @param line the line object to be removed
              */
             function eraseLine(line) {
                 var index = line.name;
@@ -621,7 +589,7 @@ canvas {
              */
             function editUp() {
                 if (this.alpha == 1) {
-                    setMainText(4);
+                    setMainText(richText, 4, lines);
                     hideButtons();
                     state = 'edit';
                 }
@@ -629,41 +597,60 @@ canvas {
 
             //Drag point functions
             function onDragStart(event) {
-                if (state == 'edit') { 
+                if (state == 'edit') {
                     // store a reference to the data
                     // the reason for this is because of multitouch
                     // we want to track the movement of this particular touch
                     this.data = event.data;
                     this.alpha = 0.5;
-                 //   richText.text = this.name;
+                    //   richText.text = this.name;
                     points[this.name].owner.image.alpha = 0.5;
                     points[this.name].owner.data.alpha = 0.5;
                     points[this.name].owner.clearImage();
                     points[this.name].owner.resetImage();
+                    points[this.name].resetImage();
+                    this.dragging = true;
                     if (currentLine != points[this.name].owner) {
                         currentLine = points[this.name].owner;
-                        createGraph(currentLine);
+                        createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
+                        app.stage.addChild(graphs);
+
                     }
-                    this.dragging = true;
+                    richText.text = 'starting';
+
+                    
                 }
             }
+
             function onDragEnd() {
                 if (state == 'edit') {
                     this.alpha = 1;
+                    richText.text = 'just fine';
                     points[this.name].owner.image.alpha = 1;
                     points[this.name].owner.data.alpha = 1;
                     points[this.name].owner.displayDetails();
-                    createGraph(currentLine);
+                    
                     this.dragging = false;
                     // set the interaction data to null
                     this.data = null;
+                    createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
+                    app.stage.addChild(graphs);
                 }
             }
+
             function onDragMove() {
-                if (state == 'edit') { 
+                if (state == 'edit') {
                     if (this.dragging) {
+                        if (this.alpha != 0.5) {
+                            richText.text = 'glitch';
+                        }
+                        else {
+                            richText.text = 'no glitch here';
+
+                        }
                         const newPosition = this.data.getLocalPosition(this.parent);
                         var changeX = newPosition.x;
+                        var changeY = newPosition.y;
                         var changeY = newPosition.y;
 
                         if (newPosition.x < 0) {
@@ -682,6 +669,7 @@ canvas {
                         points[this.name].changeLocation(changeX, changeY);
                         points[this.name].owner.clearImage();
                         points[this.name].owner.resetImage();
+                        points[this.name].resetImage();
                     }
                 }
             }
@@ -689,17 +677,18 @@ canvas {
             //Drag line
             function onDragLineEnd() {
                 if (state == 'edit') {
-                
                     this.alpha = 1;
                     lines[this.name].clearImage();
                     lines[this.name].resetImage();
                     lines[this.name].startPoint.image.alpha = 1;
-                   // lines[this.name].startPoint.resetImage();
+                    lines[this.name].startPoint.resetImage();
                     lines[this.name].endPoint.image.alpha = 1;
-                   // lines[this.name].endPoint.resetImage();
+                    lines[this.name].endPoint.resetImage();
                     lines[this.name].displayDetails();
                     this.dragging = false;
-                    createGraph(currentLine);
+                    createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
+                    app.stage.addChild(graphs);
+
                     this.eventData = null;
                 }
             }
@@ -738,7 +727,7 @@ canvas {
                         else if (lines[this.name].endPoint.y + changeY >= app.screen.height) {
                             changeY = app.screen.height - (lines[this.name].endPoint.y);
                         }
-                        
+
                         if (move) {
                             lines[this.name].startPoint.changeLocation(lines[this.name].startPoint.x + changeX, lines[this.name].startPoint.y + changeY);
                             lines[this.name].endPoint.changeLocation(lines[this.name].endPoint.x + changeX, lines[this.name].endPoint.y + changeY);
@@ -774,7 +763,6 @@ canvas {
                         const newPosition = this.data.getLocalPosition(this.parent);
                         var changeX = newPosition.x - this.dragx;
                         var changeY = newPosition.y - this.dragy;
-                        richText.text = 'boundary X: ' + boundary_tlx + ' boundary Y: ' + boundary_tly;
                         if (boundary_tlx + changeX < 0) {
                             changeX = 0 - boundary_tlx;
                         }
@@ -817,36 +805,38 @@ canvas {
              */
             function clearUp() {
                 //if (this.alpha == 1) {
-                    for (var i = 0; i < lines.length; i++) {
-                        var line = lines[i];
-                        if (line == currentLine) {
-                            graphs.clear();
-                            graphs.removeChildren();
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    if (line == currentLine) {
+                        graphs.clear();
+                        graphs.removeChildren();
 
-                            graphics.clear();
-                            hTextContainer.removeChildren();
-                            vTextContainer.removeChildren();
-                            currentLine = -1;
-                        }
-                        line.removeLine();
-                        erasePoint(line.startPoint);
-                        erasePoint(line.endPoint);
+                        graphics.clear();
+                       // hTextContainer.removeChildren();
+                       // vTextContainer.removeChildren();
+                        currentLine = -1;
                     }
-                    lines = [];
-                    setMainText(0);
-              //  }
+                    line.removeLine();
+                    erasePoint(line.startPoint);
+                    erasePoint(line.endPoint);
+                }
+                lines = [];
+                setMainText(richText, 0, lines);
+                //  }
             }
 
             /**
-             * When a user clicks on a line that line will call this function which will decide on what to do 
+             * When a user clicks on a line that line will call this function which will decide on what to do
              * depending on the current state of the application.
              * @param line the line that was selected by the user
              */
-            function lineSelect(event){
+            function lineSelect(event) {
                 if (state == 'neutral') {   //Will display the information of said line
                     currentLine = lines[this.name];
-                    createGraph(lines[this.name]);
-                    setMainText(0);
+                    createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
+                    app.stage.addChild(graphs);
+
+                    setMainText(richText, 0, lines);
                 }
                 else if (state == 'erase') {    //Will delete said line
                     eraseLine(lines[this.name]);
@@ -859,7 +849,9 @@ canvas {
                     lines[this.name].endPoint.image.alpha = 0.5;
                     if (currentLine != lines[this.name]) {
                         currentLine = lines[this.name];
-                        createGraph(currentLine);
+                        createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
+                        app.stage.addChild(graphs);
+
                     }
                     this.dragging = true;
                     this.eventData = event.data;
@@ -868,184 +860,7 @@ canvas {
                 }
             }
 
-            /**
-             * The create graph function contructs the visual representation of the data collected by the line
-             * details function. A graph is handmade using rectangles, lines and text. The sizes 
-             * are arbitrary for now and can be changed later on. As of now the graph has a specfic
-             * size and position that it sticks to.
-             * @param line the line object to extract information from
-             */
-            function createGraph(line) {
-                //Resets graph related visuals
-                
-                graphs.clear();
-                graphs.removeChildren();
-                hTextContainer.removeChildren();
-                vTextContainer.removeChildren();
-
-                //Create a rectangle
-                //Outside boundary 
-                
-                var outsideBoundary = new PIXI.Graphics();
-                outsideBoundary.lineStyle(1, 0x000000, 1);
-                outsideBoundary.beginFill(0xffffff);
-                outsideBoundary.drawRect(boundary_tlx, boundary_tly, boundaryWidth, boundaryHeight);
-                outsideBoundary.endFill();
-                var polyPts;
-                polyPts = [boundary_tlx, boundary_tly, boundary_tlx, boundary_tly + boundaryHeight, boundary_tlx + boundaryWidth, boundary_tly + boundaryHeight, boundary_tlx + boundaryWidth, boundary_tly];
-                outsideBoundary.hitArea = new PIXI.Polygon(polyPts);
-                graphs.addChild(outsideBoundary);
-
-                //Inner graph
-                var innerGraph = new PIXI.Graphics();
-                var graph_tlx = boundary_tlx + 50;
-                var graph_tly = boundary_tly + 25;
-                var graphWidth = 425;
-                var graphHeight = 225;
-                innerGraph.lineStyle(1, 0x000000, 1);
-                innerGraph.beginFill(0xffffff);
-                innerGraph.drawRect(graph_tlx, graph_tly, graphWidth, graphHeight);
-                innerGraph.endFill();
-                graphs.addChild(innerGraph);
-
-                //This takes care of the horizontal segements of the graph
-                var horizontalColumns = 10;
-                var horizontalHalfSpacing = graphWidth / (horizontalColumns * 2);    //Spacing between each noted index
-                var horizontalDashY = graph_tly + graphHeight;      //Starting point for everything (Bottom of graph)
-                var horizontalDashX = graph_tlx;        //Left hand side
-                var currentX = horizontalDashX + horizontalHalfSpacing;     //Off sets the first element
-                
-                var horizontalText = [];   //Text to be used
-                for (var i = 0; i <= horizontalColumns; i++) {
-                    horizontalText.push(Math.floor((line.lineDataPoints.length / 10) * i));
-                }
-                for (var i = 0; i < horizontalColumns; i++) {
-                    var indexLine = new PIXI.Graphics();
-                    indexLine.lineStyle(1, 0x000000)               //Creates a line to indicate the index
-                        .moveTo(currentX, horizontalDashY - 5)
-                        .lineTo(currentX, horizontalDashY + 5);
-                    graphs.addChild(indexLine);
-
-                    const hText = new PIXI.Text(horizontalText[i], graphText);  //Adds text underneath it
-                    hText.x = currentX - hText.width/2;
-                    hText.y = horizontalDashY + 10;
-                    hTextContainer.addChild(hText);
-
-                    var backgroundLine = new PIXI.Graphics();
-                    backgroundLine.lineStyle(1, 0x33FFFC)               //Creates the background lines for the graph
-                        .moveTo(currentX, horizontalDashY - graphHeight)
-                        .lineTo(currentX, horizontalDashY);
-                    graphs.addChild(backgroundLine);
-
-                    currentX += 2 * horizontalHalfSpacing;
-                }
-
-                //This takes care of the vertical segements of the graph
-                var verticalRows = 15;
-                if (line.valueDifference < verticalRows) {
-                    verticalRows = line.valueDifference;
-                }
-                var verticalSpacing = graphHeight / verticalRows;
-                var verticalDashY = graph_tly + graphHeight;
-                var verticalDashX = graph_tlx;
-                var currentY = verticalDashY;
-               // var verticalText = ["51", "102", "153", "204", "255"];
-                var verticalText = [];
-                var verticalValueSpacing = line.valueDifference / verticalRows;
-                var counter = 0;
-                for (var i = 0; i <= verticalRows; i++) {
-                    verticalText.push(Math.floor(counter));
-                    counter += verticalValueSpacing;
-                }
-
-                for (var i = 0; i <= verticalRows; i++) {
-                    const vText = new PIXI.Text(verticalText[i], graphText);
-                    vText.x = verticalDashX - 20;
-                    var vIndexLine = new PIXI.Graphics();
-                    vIndexLine.lineStyle(1, 0x000000)       //Vertical entry index
-                        .moveTo(verticalDashX - 5, currentY)
-                        .lineTo(verticalDashX, currentY);
-                    graphs.addChild(vIndexLine);
-
-                    if (i != 0) {
-                        var vBackgroundLine = new PIXI.Graphics();
-                        vBackgroundLine.lineStyle(1, 0x33FFFC)   //Background lines
-                            .moveTo(verticalDashX, currentY)
-                            .lineTo(verticalDashX + graphWidth, currentY);
-                        graphs.addChild(vBackgroundLine);
-                    }
-                    vText.y = currentY - (vText.height) / 2;
-                    vTextContainer.addChild(vText);
-                    currentY -= verticalSpacing;
-                }
-
-
-                //This plots the actual data of the graph 
-                
-                var arrayLength = line.lineDataPoints.length; //used for loop bounds
-                var valueSpacing = graphHeight / line.valueDifference;   //finds pixel length of each individual y value (y-axis)
-                var entrySpacing = (graphWidth - (horizontalHalfSpacing * 2)) / arrayLength;    //Spacing between each entry (x-axis)
-                var entryStartY = graph_tly + graphHeight;      //Starting point for everything (Bottom of graph)
-                var entryStartX = graph_tlx + horizontalHalfSpacing;        //Left hand side
-                var entryCurrentX = entryStartX;
-                for (var i = 0; i < arrayLength; i++) {
-                    var peakCheck = false;
-                    var peakLength = line.peakData.length;
-                    for (var j = 0; j < peakLength; j++) {
-                        if (i == line.peakData[j]) {
-                            peakCheck = true;
-                            break;
-                        }//end if
-                    }//end for
-                    var valleyCheck = false;
-                    var valleyLength = line.valleyData.length;
-                    for (var j = 0; j < valleyLength; j++) {
-                        if (i == line.valleyData[j]) {
-                            valleyCheck = true;
-                            break;
-                        }//end if
-                    }//end for
-                    if (peakCheck) {
-                        slopeText.text += '\n' + 'Drawing peak at ' + i; //Used for testing not necessary
-
-                        var peakBar = new PIXI.Graphics();
-                        peakBar.lineStyle(2, 0x165F0A)               //Creates bar for the ith entry of the bar graph
-                            .moveTo(entryCurrentX - 1, entryStartY)
-                            .lineTo(entryCurrentX - 1, entryStartY - (valueSpacing * (line.lineDataPoints[i])));
-                        graphs.addChild(peakBar);
-                    }// end if
-                    else if (valleyCheck) {
-                        slopeText.text += '\n' + 'Drawing valley at ' + i; //Used for testing not necessary
-                        var valleyBar = new PIXI.Graphics();
-                        valleyBar.lineStyle(2, 0x0A175F)               //Creates bar for the ith entry of the bar graph
-                            .moveTo(entryCurrentX - 1, entryStartY)
-                            .lineTo(entryCurrentX - 1, graph_tly);
-                        graphs.addChild(valleyBar);
-                    }// end else if
-                    else {
-                        var entryBar = new PIXI.Graphics();
-                        entryBar.lineStyle(2, 0xC70039)               //Creates bar for the ith entry of the bar graph
-                            .moveTo(entryCurrentX - 1, entryStartY)
-                            .lineTo(entryCurrentX - 1, entryStartY - (valueSpacing * (line.lineDataPoints[i])));
-                        graphs.addChild(entryBar);
-                    }// end else
-                    entryCurrentX += entrySpacing;
-                }//end of for loop
-
-                //Draw baseline
-                var baslineImage = new PIXI.Graphics();
-                baslineImage.lineStyle(1, 0x4A235A)
-                    .moveTo(verticalDashX, entryStartY - (valueSpacing * (line.baseline)))
-                    .lineTo(verticalDashX + graphWidth, entryStartY - (valueSpacing * (line.baseline)));
-                graphs.addChild(baslineImage);
-
-                app.stage.addChild(graphs);
-                app.stage.addChild(vTextContainer);
-                app.stage.addChild(hTextContainer);
-
-
-
-            }//end of create graph
+            
 
         }// end setup
 
