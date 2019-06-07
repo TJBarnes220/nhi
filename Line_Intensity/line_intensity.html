@@ -78,7 +78,7 @@ canvas {
             previous_button.y = app.screen.height - 50;
             previous_button.interactive = true;
             previous_button.buttonMode = true;
-            previous_button.on('pointerdown', showAll);
+            previous_button.on('pointerdown', LI_showAll);
 
             const next_button = new PIXI.Sprite.from('../images/next_icon.png');
             app.stage.addChild(next_button);
@@ -86,11 +86,11 @@ canvas {
             next_button.height = 50;
             next_button.x = app.screen.width - 50;
             next_button.y = app.screen.height - 50;
-            next_button.alpha = 0;
-            next_button.on('pointerdown', hideAll);
+            next_button.interactive = true;
+            next_button.buttonMode = true;
+            next_button.on('pointerdown', LI_hideAll);
 
             
-           // app.stage.removeListener('pointerdown', drawPoint);
 
         }// end setup
 
