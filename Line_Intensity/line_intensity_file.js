@@ -1,229 +1,184 @@
-// create a background...
-//Sets to match app size
-//TODO: Should add the functionality of resizing as app resizes
-const background = new PIXI.Sprite.from('../images/Picture1.png');
-//background.width = app.screen.width;
-//background.height = app.screen.height;
+var LI_lineContainer = [];
+var LI_pointContainer = [];
+
+var LI_state = 'neutral';
+
+var LI_currentStart = -1;
+var LI_currentLine = -1;
+
+var LI_drawing = false;
+var LI_cancel = false;
+
+var LI_boundary_tlx = 0;
+var LI_boundary_tly = 0;
+
+const LI_mainText = new PIXI.Text('Hello', style);
+const LI_backgroundImage = new PIXI.Sprite.from('../images/Picture1.png');
+
+var LI_buttonCommands = [];
+const LI_draw_button = new PIXI.Sprite.from('../images/line_tool_icon.png');
+LI_draw_button.width = 50;
+LI_draw_button.height = 50;
+LI_draw_button.x = 0;
+LI_draw_button.y = 0;
+LI_draw_button.interactive = true;
+LI_draw_button.on('pointerdown', activateDraw);
+LI_draw_button.on('pointerup', activateUp);
+LI_buttonCommands.push(LI_draw_button);
 
 
+const LI_edit_button = new PIXI.Sprite.from('../images/edit_tool_icon.png');
+LI_edit_button.width = 50;
+LI_edit_button.height = 50;
+LI_edit_button.x = 50;
+LI_edit_button.y = 0;
+LI_edit_button.interactive = true;
+LI_edit_button.on('pointerdown', editDown);
+LI_edit_button.on('pointerup', editUp);
+LI_buttonCommands.push(LI_edit_button);
 
-var button_commands = [];
+const LI_eraser_button = new PIXI.Sprite.from('../images/eraser_icon.png');
+LI_eraser_button.width = 50;
+LI_eraser_button.height = 50;
+LI_eraser_button.x = 100;
+LI_eraser_button.y = 0;
+LI_eraser_button.interactive = true;
+LI_eraser_button.on('pointerdown', eraseDown);
+LI_eraser_button.on('pointerup', eraseUp);
+LI_buttonCommands.push(LI_eraser_button);
 
-//Cancel button is used to end line drawing process prematurely
-//Will appear once first point has been added
-//Clicking on it resets all values like starting point, text, etc....
-const cancel_button = new PIXI.Sprite.from('../images/cancel_icon.png');
-cancel_button.width = 50;
-cancel_button.height = 50;
-cancel_button.x = 0;
-cancel_button.y = 0;
-cancel_button.alpha = 0;
-cancel_button.interactive = true;
-cancel_button.buttonMode = true;
-cancel_button.on('pointerdown', cancelDown);
-cancel_button.on('pointerup', cancelUp);
-cancel_button.on('pointerupoutside', cancelOutSide);
+const LI_clear_button = new PIXI.Sprite.from('../images/clear_all_icon.png');
+LI_clear_button.width = 50;
+LI_clear_button.height = 50;
+LI_clear_button.x = 150;
+LI_clear_button.y = 0;
+LI_clear_button.interactive = true;
+LI_clear_button.on('pointerdown', clearDown);
+LI_clear_button.on('pointerup', clearUp);
+LI_buttonCommands.push(LI_clear_button);
 
-const draw_button = new PIXI.Sprite.from('../images/line_tool_icon.png');
-draw_button.width = 50;
-draw_button.height = 50;
-draw_button.x = 0;
-draw_button.y = 0;
-draw_button.interactive = true;
-draw_button.on('pointerdown', activateDraw);
-draw_button.on('pointerup', activateUp);
-//Value used to determine if user clicked on cancel button
-button_commands.push(draw_button);
-let cancel = false;
+const LI_cancel_button = new PIXI.Sprite.from('../images/LI_cancel_icon.png');
+LI_cancel_button.width = 50;
+LI_cancel_button.height = 50;
+LI_cancel_button.x = 0;
+LI_cancel_button.y = 0;
+LI_cancel_button.alpha = 0;
+LI_cancel_button.interactive = true;
+LI_cancel_button.buttonMode = true;
+LI_cancel_button.on('pointerdown', LI_cancelDown);
+LI_cancel_button.on('pointerup', LI_cancelUp);
+LI_cancel_button.on('pointerupoutside', LI_cancelOutSide);
 
-const edit_button = new PIXI.Sprite.from('../images/edit_tool_icon.png');
-edit_button.width = 50;
-edit_button.height = 50;
-edit_button.x = 50;
-edit_button.y = 0;
-edit_button.interactive = true;
-edit_button.on('pointerdown', editDown);
-edit_button.on('pointerup', editUp);
-button_commands.push(edit_button);
-
-const eraser_button = new PIXI.Sprite.from('../images/eraser_icon.png');
-eraser_button.width = 50;
-eraser_button.height = 50;
-eraser_button.x = 100;
-eraser_button.y = 0;
-eraser_button.interactive = true;
-eraser_button.on('pointerdown', eraseDown);
-eraser_button.on('pointerup', eraseUp);
-button_commands.push(eraser_button);
-
-const clear_button = new PIXI.Sprite.from('../images/clear_all_icon.png');
-clear_button.width = 50;
-clear_button.height = 50;
-clear_button.x = 150;
-clear_button.y = 0;
-clear_button.interactive = true;
-clear_button.on('pointerdown', clearDown);
-clear_button.on('pointerup', clearUp);
-button_commands.push(clear_button);
-
-
-
-
-
-/*
- * States:
- * Neutral
- * Drawing (line creation)
- * Eraser
- * */
-
-let state = 'neutral';
-
-
-//Creates style used by text. It is currently unnecessary but more of an example
-const style = new PIXI.TextStyle({
-    fontFamily: 'Arial',
-    fontSize: 36,
-    fontStyle: 'italic',
-    fontWeight: 'bold',
-    fill: ['#ffffff', '#00ff99'], // gradient
-    align: 'center',
-    stroke: '#4a1850',
-    strokeThickness: 5,
-    dropShadow: true,
-    dropShadowColor: '#000000',
-    dropShadowBlur: 4,
-    dropShadowAngle: Math.PI / 6,
-    dropShadowDistance: 6,
-    wordWrap: true,
-    wordWrapWidth: 500,
-});
-
-//Tells user how to use application
-//Text will change along with process
-const richText = new PIXI.Text('Hello', style);
-
-//app.stage.addChild(richText);
-//Some constants initialized here to be used later
-//Graphics concern the line itself
-const graphics = new PIXI.Graphics();
-//Graphs deals with the actual graph drawn as a result to the line data
-const graphs = new PIXI.Graphics();
-graphs.buttonMode = true;
-graphs.interactive = true;
-graphs
-    .on('pointerdown', onDragGraphStart)
+const LI_graphics = new PIXI.LI_graphics();
+//LI_graphs deals with the actual graph drawn as a result to the line data
+const LI_graphs = new PIXI.LI_graphics();
+LI_graphs.buttonMode = true;
+LI_graphs.interactive = true;
+LI_graphs
+    .on('pointerdown', onDragLI_graphstart)
     .on('pointerup', onDragGraphEnd)
     .on('pointerupoutside', onDragGraphEnd)
     .on('pointermove', onDragGraphMove);
 
-var boundary_tlx = app.screen.width / 2;
-var boundary_tly = app.screen.height / 2;
-//This container will hold all the horizontal graph text
-const hTextContainer = new PIXI.Container();
-app.stage.addChild(hTextContainer);
-//This container will hold all the vertical graph text
-const vTextContainer = new PIXI.Container();
-app.stage.addChild(vTextContainer);
-
-//This determines whether a line is currently being drawn
-//is used in the draw point function
-let drawing = false;
-//Variable used to hold starting point for the line
-// var points = [0, 0];
-var currentStart = -1;
-var currentLine = -1;
-var lines = [];
-var points = [];
-
-//Sets the app to be interactable and allows drawPoint function to be called
-//When user clicks anywhere on screen
-app.stage.interactive = true;
-app.stage.on('pointerdown', drawPoint);
 
 function showAll() {
+    const IndexText = new PIXI.Text('Hello Test Text', style);
+    app.stage.addChild(IndexText);
+    IndexText.alpha = 1;
+    IndexText.x = app.screen.width / 2 - 250;
+    IndexText.y = 200;
+
+
+
+
     this.alpha = 0;
     this.interactive = false;
     this.buttonMode = false;
-    //next_button.alpha = 1;
-  //  next_button.interactive = true;
-  //  next_button.buttonMode = true;
-   // 
-
-    app.stage.addChild(background);
-    background.width = app.screen.width;
-    background.height = app.screen.height;
-
-    app.stage.addChild(cancel_button);
-    for (var i = 0; i < button_commands.length; i++) {
-        app.stage.addChild(button_commands[i]);
-        button_commands[i].alpha = 1;
-        button_commands[i].interactive = true;
-        button_commands[i].buttonMode = true;
-    }
+   
+    app.stage.addChild(LI_backgroundImage);
+    LI_backgroundImage.width = app.screen.width;
+    LI_backgroundImage.height = app.screen.height;
     
-    app.stage.addChild(richText);
-    richText.alpha = 1;
-    richText.x = app.screen.width / 2 - 250;
-    richText.y = 0;
-    state = 'nuetral';
+    app.stage.addChild(LI_cancel_button);
+    
+    for (var i = 0; i < LI_buttonCommands.length; i++) {
+        app.stage.addChild(LI_buttonCommands[i]);
+        LI_buttonCommands[i].alpha = 1;
+        LI_buttonCommands[i].interactive = true;
+        LI_buttonCommands[i].buttonMode = true;
+    }
 
-    app.stage.interactive = true;
+    app.stage.addChild(LI_mainText);
+    LI_mainText.alpha = 1;
+    LI_mainText.x = app.screen.width / 2 - 250;
+    LI_mainText.y = 0;
+
+    app.stage.addChild(LI_graphics);
+    app.stage.addChild(LI_graphs);
+
+    LI_LI_boundary_tlx = app.screen.width / 2;
+    LI_boundary_tly = app.screen.height / 2;
+
+    //app.stage.interactive = true;
+    //app.stage.buttonMode = true;
+    //app.stage.on('pointerdown', drawPoint);
+    //app.stage.addChild(this.data);
+   
     app.stage.on('pointerdown', drawPoint);
 }
 
 function hideAll() {
-    state = 'nuetral';
+    LI_state = 'nuetral';
     clearUp();
-    for (var i = 0; i < button_commands.length; i++) {
-        button_commands[i].alpha = 0;
-        button_commands[i].interactive = false;
-        button_commands[i].buttonMode = false;
+    for (var i = 0; i < LI_buttonCommands.length; i++) {
+        LI_buttonCommands[i].alpha = 0;
+        LI_buttonCommands[i].interactive = false;
+        LI_buttonCommands[i].buttonMode = false;
     }
-    cancel_button.alpha = 0;
-    cancel_button.interactive = false;
-    cancel_button.buttonMode = false;
+    LI_cancel_button.alpha = 0;
+    LI_cancel_button.interactive = false;
+    LI_cancel_button.buttonMode = false;
     next_button.alpha = 0;
     next_button.interactive = false;
     next_button.buttonMode = false;
     previous_button.alpha = 1;
     previous_button.interactive = true;
     previous_button.buttonMode = true;
-    richText.alpha = 0;
+    LI_mainText.alpha = 0;
 }
 
 /**
- * Once activating one of the command buttons they will all be hidden to reveal the cancel button
+ * Once activating one of the command buttons they will all be hidden to reveal the LI_cancel button
  * This function provides that process but setting all the command buttons alpha values to zero and bringing the
- * cancel button to the front to allow users to click on it.
+ * LI_cancel button to the front to allow users to click on it.
  */
 function hideButtons() {
-    for (var i = 0; i < button_commands.length; i++) {
-        button_commands[i].alpha = 0;
-        button_commands[i].interactive = false;
-        button_commands[i].buttonMode = false;
+    for (var i = 0; i < LI_buttonCommands.length; i++) {
+        LI_buttonCommands[i].alpha = 0;
+        LI_buttonCommands[i].interactive = false;
+        LI_buttonCommands[i].buttonMode = false;
     }
-    cancel_button.alpha = 1;
-    bringToFront(cancel_button);
+    LI_cancel_button.alpha = 1;
+    bringToFront(LI_cancel_button);
 }
 
 /**
  * This simply does the opposite of hideButtons by revealing and bringing all command buttons to the front
- * while hiding the cancel button.
+ * while hiding the LI_cancel button.
  */
 function showButtons() {
-    for (var i = 0; i < button_commands.length; i++) {
-        button_commands[i].alpha = 1;
-        button_commands[i].interactive = true;
-        button_commands[i].buttonMode = true;
-        bringToFront(button_commands[i]);
+    for (var i = 0; i < LI_buttonCommands.length; i++) {
+        LI_buttonCommands[i].alpha = 1;
+        LI_buttonCommands[i].interactive = true;
+        LI_buttonCommands[i].buttonMode = true;
+        bringToFront(LI_buttonCommands[i]);
     }
-    cancel_button.alpha = 0;
+    LI_cancel_button.alpha = 0;
 }
 
 /**
  * Draw point allows the user to place a point on the image
- * The first time the user does this the line drawing process will begin and drawing switches to true
+ * The first time the user does this the line LI_drawing process will begin and LI_drawing switches to true
  * The starting point will be displayed by a small square and the app will wait for the user to
  * click on the screen again
  * Once activated again the app will denonte the end point of the user's line and create a straight
@@ -231,34 +186,34 @@ function showButtons() {
  * displayed and a graph will be created with its information.
  */
 function drawPoint(event) {
-
-    if (state == 'drawing') { //Checks if in desired state
-        if (!cancel) {  //Checks if user clicked on cancel button
-            if (!drawing) { //Checks what phase of line create user is in
-                graphics.clear(); //Clears current graphics on screen
-                //Changes drawing value
-                drawing = true;
+   // if (LI_state == 'LI_drawing') { //Checks if in desired LI_state
+    //    if (!LI_cancel) {  //Checks if user clicked on LI_cancel button
+            if (!LI_drawing) { //Checks what phase of line create user is in
+                LI_graphics.clear(); //Clears current LI_graphics on screen
+                //Changes LI_drawing value
+                LI_drawing = true;
                 //Updates starting point
                 //  points = [event.data.global.x, event.data.global.y];
                 //Creates the starting point for the line
-                currentStart = new Point(event.data.global.x, event.data.global.y);
-                currentStart.image.name = points.length;
+                LI_currentStart = new Point(event.data.global.x, event.data.global.y);
+                LI_currentStart.image.name = LI_pointContainer.length;
 
-                points.push(currentStart);
-                //Updates text and cancel button
-                setMainText(richText, 2, lines);
-            }//end drawing if
+                LI_pointContainer.push(LI_currentStart);
+                //Updates text and LI_cancel button
+                
+                setMainText(LI_mainText, 2, LI_lineContainer);
+            }//end LI_drawing if
             else {
                 //Creates the end point of the line
                 var endPoint = new Point(event.data.global.x, event.data.global.y);
-                endPoint.image.name = points.length;
-                points.push(endPoint);
+                endPoint.image.name = LI_pointContainer.length;
+                LI_pointContainer.push(endPoint);
                 //Contructs the line graphic to be place inside the line object
-                var lineImage = new PIXI.Graphics();
+                var lineImage = new PIXI.LI_graphics();
                 lineImage.lineStyle(1, 0x9900CC)
-                    .moveTo(currentStart.x, currentStart.y)
+                    .moveTo(LI_currentStart.x, LI_currentStart.y)
                     .lineTo(endPoint.x, endPoint.y);
-                lineImage.name = lines.length;
+                lineImage.name = LI_lineContainer.length;
                 lineImage.interactive = true;
                 lineImage.buttonMode = true;
                 lineImage
@@ -268,24 +223,24 @@ function drawPoint(event) {
                     .on('pointermove', onDragLineMove);
                 //Creates the hit area of said line graphic
                 var polyPts;
-                if (currentStart.x > endPoint.x) {
-                    polyPts = [currentStart.x - 5, currentStart.y - 5, currentStart.x + 5, currentStart.y + 5, endPoint.x + 5, endPoint.y + 5, endPoint.x - 5, endPoint.y - 5];
+                if (LI_currentStart.x > endPoint.x) {
+                    polyPts = [LI_currentStart.x - 5, LI_currentStart.y - 5, LI_currentStart.x + 5, LI_currentStart.y + 5, endPoint.x + 5, endPoint.y + 5, endPoint.x - 5, endPoint.y - 5];
                 }
-                else if (currentStart.x < endPoint.x) {
-                    polyPts = [currentStart.x - 5, currentStart.y + 5, currentStart.x + 5, currentStart.y - 5, endPoint.x + 5, endPoint.y - 5, endPoint.x - 5, endPoint.y + 5];
+                else if (LI_currentStart.x < endPoint.x) {
+                    polyPts = [LI_currentStart.x - 5, LI_currentStart.y + 5, LI_currentStart.x + 5, LI_currentStart.y - 5, endPoint.x + 5, endPoint.y - 5, endPoint.x - 5, endPoint.y + 5];
                 }
-                else if (currentStart.x == endPoint.x) {
-                    polyPts = [currentStart.x - 5, currentStart.y, currentStart.x + 5, currentStart.y, endPoint.x + 5, endPoint.y, endPoint.x - 5, endPoint.y];
+                else if (LI_currentStart.x == endPoint.x) {
+                    polyPts = [LI_currentStart.x - 5, LI_currentStart.y, LI_currentStart.x + 5, LI_currentStart.y, endPoint.x + 5, endPoint.y, endPoint.x - 5, endPoint.y];
                 }
                 //Used to show hitarea for testing purposes
-                // var pGraphic = new PIXI.Graphics();
+                // var pGraphic = new PIXI.LI_graphics();
                 //       pGraphic.beginFill(0x1C2833);
                 //     pGraphic.drawPolygon(polyPts);
                 //   app.stage.addChild(pGraphic);
                 lineImage.hitArea = new PIXI.Polygon(polyPts);
                 app.stage.addChild(lineImage);
                 //contructs line object
-                currentStart.image
+                LI_currentStart.image
                     .on('pointerdown', onDragStart)
                     .on('pointerup', onDragEnd)
                     .on('pointerupoutside', onDragEnd)
@@ -295,19 +250,19 @@ function drawPoint(event) {
                     .on('pointerup', onDragEnd)
                     .on('pointerupoutside', onDragEnd)
                     .on('pointermove', onDragMove);
-                currentLine = new Line(currentStart, endPoint, background, lines.length, lineImage);
+                LI_currentLine = new Line(LI_currentStart, endPoint, LI_backgroundImage, LI_lineContainer.length, lineImage);
                 //Calls data functions to show user the results on the line they drew
-                currentLine.displayDetails();   //Displays the details of the line by fetching its information
+                LI_currentLine.displayDetails();   //Displays the details of the line by fetching its information
 
-                createGraph(graphs, currentLine, boundary_tlx, boundary_tly);  //Creates a graph from said line
-                app.stage.addChild(graphs);
-                lines.push(currentLine);    //Adds this line to the area of lines
-                drawing = false;    //Ends the drawing state
+                createGraph(LI_graphs, LI_currentLine, LI_boundary_tlx, LI_boundary_tly);  //Creates a graph from said line
+                app.stage.addChild(LI_graphs);
+                LI_lineContainer.push(LI_currentLine);    //Adds this line to the area of lines
+                LI_drawing = false;    //Ends the LI_drawing LI_state
                 endDraw();
 
             }//end else
-        }//end cancel if
-    }// end active if
+    //    }//end LI_cancel if
+    //}// end active if
 
 }// end draw point
 
@@ -316,7 +271,7 @@ function drawPoint(event) {
  * @param event
  */
 function activateDraw(event) {
-    //  cancel_button.texture = resources.t2.texture
+    //  LI_cancel_button.texture = resources.t2.texture
     if (this.alpha == 1) {
         //show animated button press????
 
@@ -325,95 +280,98 @@ function activateDraw(event) {
 }
 
 /**
- * This function actually starts the drawing state by changing the main text, hidding the command buttons
- * and setting active to true and state to drawing.
+ * This function actually starts the LI_drawing LI_state by changing the main text, hidding the command buttons
+ * and setting active to true and LI_state to LI_drawing.
  * @param event
  */
 function activateUp(event) {
     if (this.alpha == 1) {
-        setMainText(richText, 1, lines);
+        setMainText(LI_mainText, 1, LI_lineContainer);
         hideButtons();
-        active = true;
-        state = 'drawing';
+        LI_state = 'LI_drawing';
+        app.stage.interactive = true;
     }
 }
 
 /**
- * End Draw is used to move from the drawing state to the neutral state whether by actually making a line or
- * by canceling the state prematurely.
+ * End Draw is used to move from the LI_drawing LI_state to the neutral LI_state whether by actually making a line or
+ * by LI_canceling the LI_state prematurely.
  */
 function endDraw() {
-    drawing = false;
-    active = false;
-    state = 'neutral';
+    LI_drawing = false;
+    LI_state = 'neutral';
     showButtons();
     //  points = [0, 0];
-    currentStart = -1;
-    setMainText(richText, 0, lines);
+    LI_currentStart = -1;
+    setMainText(LI_mainText, 0, LI_lineContainer);
+    app.stage.interactive = false;
 }
 
 /**
- * This function is called when the user clicks on the cancel button.
+ * This function is called when the user clicks on the LI_cancel button.
  * The contents of this function won't run unless the button is clearly visible to the user.
  * Pressing down on the button will prevent the user from creating/doing anything for the
- * current state like erase or draw. However this doesn't activate the transfer of states.
+ * current LI_state like erase or draw. However this doesn't activate the transfer of LI_states.
  * This is to allow the user to change their mind by releasing outside the button.
- * @param event the action of clicking on the cancel button sprite
+ * @param event the action of clicking on the LI_cancel button sprite
  */
-function cancelDown(event) {
-    cancel = true;
-}// end cancel draw
+function LI_cancelDown(event) {
+    LI_cancel = true;
+    app.stage.interactive = false;
+}// end LI_cancel draw
 
 /**
- * This is to undo the contents of cancel down without actually changing states
+ * This is to undo the contents of LI_cancel down without actually changing LI_states
  * @param event
  */
-function cancelOutSide(event) {
-    cancel = false;
+function LI_cancelOutSide(event) {
+    LI_cancel = false;
 }
 
 /**
- * When releasing click/press/etc ontop of the cancel button this will prematurely exit
- * the current state back into neutral. So if the current user is drawing the line they were working on will
+ * When releasing click/press/etc ontop of the LI_cancel button this will prematurely exit
+ * the current LI_state back into neutral. So if the current user is LI_drawing the line they were working on will
  * get destroyed and so on.
  *
  */
-function cancelUp(event) {
-    //Resets cancel value
-    if (cancel) {
-        if (state == 'drawing') {
-            graphics.clear();
-            graphs.clear();
-            graphs.removeChildren();
-            hTextContainer.removeChildren();
-            vTextContainer.removeChildren();
+function LI_cancelUp(event) {
+    //Resets LI_cancel value
+    if (LI_cancel) {
+        if (LI_state == 'LI_drawing') {
+            app.stage.interactive = false;
+
+            setMainText(LI_mainText, 0, LI_lineContainer);
             showButtons();
-            cancel = false;
-            drawing = false;
-            active = false;
-            state = 'neutral';
-            setMainText(richText, 0, lines);
-            currentStart.clearImage();
-            if (currentStart != -1) {
-                erasePoint(currentStart);
+
+            LI_graphics.clear();
+            LI_graphs.clear();
+            LI_graphs.removeChildren();
+
+            LI_cancel = false;
+            LI_drawing = false;
+            LI_state = 'neutral';
+            
+            if (LI_currentStart != -1) {
+                erasePoint(LI_currentStart);
             }
-            currentStart = -1;
+            LI_currentStart = -1;
+            
             endDraw();
         }
-        else if (state == 'erase') {
+        else if (LI_state == 'erase') {
             showButtons();
-            cancel = false;
-            state = 'neutral';
-            setMainText(richText, 0, lines);
+            LI_cancel = false;
+            LI_state = 'neutral';
+            setMainText(LI_mainText, 0, LI_lineContainer);
         }
-        else if (state == 'edit') {
+        else if (LI_state == 'edit') {
             showButtons();
-            cancel = false;
-            state = 'neutral';
-            setMainText(richText, 0, lines);
+            LI_cancel = false;
+            LI_state = 'neutral';
+            setMainText(LI_mainText, 0, LI_lineContainer);
         }
     }
-}//end cancel up
+}//end LI_cancel up
 
 /**
  * Similar situation to draw down so this could be used to activate a pressed down animation
@@ -423,14 +381,14 @@ function eraseDown() {
 }
 
 /**
- * When releasing this actually changes the state to erase and changes the main text
+ * When releasing this actually changes the LI_state to erase and changes the main text
  * and hides the command buttons. This only occurs if the erase icon is visible.
  */
 function eraseUp() {
     if (this.alpha == 1) {
-        setMainText(richText, 3, lines);
+        setMainText(LI_mainText, 3, LI_lineContainer);
         hideButtons();
-        state = 'erase';
+        LI_state = 'erase';
     }
 
 }
@@ -446,18 +404,16 @@ function eraseUp() {
  */
 function eraseLine(line) {
     var index = line.name;
-    lines.splice(index, 1);
-    for (var i = 0; i < lines.length; i++) {
-        lines[i].name = i;
-        lines[i].image.name = i;
+    LI_lineContainer.splice(index, 1);
+    for (var i = 0; i < LI_lineContainer.length; i++) {
+        LI_lineContainer[i].name = i;
+        LI_lineContainer[i].image.name = i;
     }
-    if (line == currentLine) {
-        graphs.clear();
-        graphs.removeChildren();
-        graphics.clear();
-        hTextContainer.removeChildren();
-        vTextContainer.removeChildren();
-        currentLine = -1;
+    if (line == LI_currentLine) {
+        LI_graphics.clear();
+        LI_graphs.clear();
+        LI_graphs.removeChildren();
+        LI_currentLine = -1;
     }
     line.removeLine();
     erasePoint(this.startPoint);
@@ -466,10 +422,10 @@ function eraseLine(line) {
 
 function erasePoint(point) {
     var index = point.image.name;
-    points.splice(index, 1);
-    for (var i = 0; i < points.length; i++) {
-        //points[i].name = i;
-        points[i].image.name = i;
+    LI_pointContainer.splice(index, 1);
+    for (var i = 0; i < LI_pointContainer.length; i++) {
+        //LI_pointContainer[i].name = i;
+        LI_pointContainer[i].image.name = i;
     }
     point.clearImage();
 }
@@ -482,58 +438,58 @@ function editDown() {
 }
 
 /**
- * When releasing this actually changes the state to erase and changes the main text
+ * When releasing this actually changes the LI_state to erase and changes the main text
  * and hides the command buttons. This only occurs if the erase icon is visible.
  */
 function editUp() {
     if (this.alpha == 1) {
-        setMainText(richText, 4, lines);
+        setMainText(LI_mainText, 4, LI_lineContainer);
         hideButtons();
-        state = 'edit';
+        LI_state = 'edit';
     }
 }
 
 //Drag point functions
 function onDragStart(event) {
-    if (state == 'edit') {
+    if (LI_state == 'edit') {
         // store a reference to the data
         // the reason for this is because of multitouch
         // we want to track the movement of this particular touch
         this.data = event.data;
         this.alpha = 0.5;
-        //   richText.text = this.name;
-        points[this.name].owner.image.alpha = 0.5;
-        points[this.name].owner.data.alpha = 0.5;
-        points[this.name].owner.clearImage();
-        points[this.name].owner.resetImage();
-        points[this.name].resetImage();
+        //   LI_mainText.text = this.name;
+        LI_pointContainer[this.name].owner.image.alpha = 0.5;
+        LI_pointContainer[this.name].owner.data.alpha = 0.5;
+        LI_pointContainer[this.name].owner.clearImage();
+        LI_pointContainer[this.name].owner.resetImage();
+        LI_pointContainer[this.name].resetImage();
         this.dragging = true;
-        if (currentLine != points[this.name].owner) {
-            currentLine = points[this.name].owner;
-            createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
-            app.stage.addChild(graphs);
+        if (LI_currentLine != LI_pointContainer[this.name].owner) {
+            LI_currentLine = LI_pointContainer[this.name].owner;
+            createGraph(LI_graphs, LI_currentLine, LI_boundary_tlx, LI_boundary_tly);
+            app.stage.addChild(LI_graphs);
 
         }
     }
 }
 
 function onDragEnd() {
-    if (state == 'edit') {
+    if (LI_state == 'edit') {
         this.alpha = 1;
-        points[this.name].owner.image.alpha = 1;
-        points[this.name].owner.data.alpha = 1;
-        points[this.name].owner.displayDetails();
+        LI_pointContainer[this.name].owner.image.alpha = 1;
+        LI_pointContainer[this.name].owner.data.alpha = 1;
+        LI_pointContainer[this.name].owner.displayDetails();
 
         this.dragging = false;
         // set the interaction data to null
         this.data = null;
-        createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
-        app.stage.addChild(graphs);
+        createGraph(LI_graphs, LI_currentLine, LI_boundary_tlx, LI_boundary_tly);
+        app.stage.addChild(LI_graphs);
     }
 }
 
 function onDragMove() {
-    if (state == 'edit') {
+    if (LI_state == 'edit') {
         if (this.dragging) {
             const newPosition = this.data.getLocalPosition(this.parent);
             var changeX = newPosition.x;
@@ -553,83 +509,84 @@ function onDragMove() {
             else if (newPosition.y >= app.screen.height) {
                 changeY = app.screen.height;
             }
-            points[this.name].changeLocation(changeX, changeY);
-            points[this.name].owner.clearImage();
-            points[this.name].owner.resetImage();
-            points[this.name].resetImage();
+            LI_pointContainer[this.name].changeLocation(changeX, changeY);
+            LI_pointContainer[this.name].owner.clearImage();
+            LI_pointContainer[this.name].owner.resetImage();
+            LI_pointContainer[this.name].resetImage();
         }
     }
 }
 
 //Drag line
 function onDragLineEnd() {
-    if (state == 'edit') {
+    if (LI_state == 'edit') {
         this.alpha = 1;
-        lines[this.name].clearImage();
-        lines[this.name].resetImage();
-        lines[this.name].startPoint.image.alpha = 1;
-        lines[this.name].startPoint.resetImage();
-        lines[this.name].endPoint.image.alpha = 1;
-        lines[this.name].endPoint.resetImage();
-        lines[this.name].displayDetails();
+        LI_lineContainer[this.name].clearImage();
+        LI_lineContainer[this.name].resetImage();
+        LI_lineContainer[this.name].startPoint.image.alpha = 1;
+        LI_lineContainer[this.name].startPoint.resetImage();
+        LI_lineContainer[this.name].endPoint.image.alpha = 1;
+        LI_lineContainer[this.name].endPoint.resetImage();
+        LI_lineContainer[this.name].displayDetails();
         this.dragging = false;
-        createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
-        app.stage.addChild(graphs);
+        createGraph(LI_graphs, LI_currentLine, LI_boundary_tlx, LI_boundary_tly);
+        app.stage.addChild(LI_graphs);
 
         this.eventData = null;
     }
 }
+
 function onDragLineMove() {
-    if (state == 'edit') {
+    if (LI_state == 'edit') {
         if (this.dragging) {
             const newPosition = this.eventData.getLocalPosition(this.parent);
             var move = true;
             var changeX = newPosition.x - this.dragx;
             var changeY = newPosition.y - this.dragy;
 
-            if (lines[this.name].startPoint.x + changeX < 0) {
-                changeX = 0 - lines[this.name].startPoint.x;
+            if (LI_lineContainer[this.name].startPoint.x + changeX < 0) {
+                changeX = 0 - LI_lineContainer[this.name].startPoint.x;
             }
-            else if (lines[this.name].endPoint.x + changeX < 0) {
-                changeX = 0 - lines[this.name].endPoint.x;
+            else if (LI_lineContainer[this.name].endPoint.x + changeX < 0) {
+                changeX = 0 - LI_lineContainer[this.name].endPoint.x;
             }
-            else if (lines[this.name].startPoint.x + changeX >= app.screen.width) {
-                changeX = app.screen.width - (lines[this.name].startPoint.x);
+            else if (LI_lineContainer[this.name].startPoint.x + changeX >= app.screen.width) {
+                changeX = app.screen.width - (LI_lineContainer[this.name].startPoint.x);
             }
-            else if (lines[this.name].endPoint.x + changeX >= app.screen.width) {
-                changeX = app.screen.width - (lines[this.name].endPoint.x);
+            else if (LI_lineContainer[this.name].endPoint.x + changeX >= app.screen.width) {
+                changeX = app.screen.width - (LI_lineContainer[this.name].endPoint.x);
             }
 
-            if (lines[this.name].startPoint.y + changeY < 0) {
-                changeY = 0 - lines[this.name].startPoint.y;
+            if (LI_lineContainer[this.name].startPoint.y + changeY < 0) {
+                changeY = 0 - LI_lineContainer[this.name].startPoint.y;
             }
-            else if (lines[this.name].endPoint.Y + changeY < 0) {
-                changeY = 0 - lines[this.name].endPoint.Y;
+            else if (LI_lineContainer[this.name].endPoint.Y + changeY < 0) {
+                changeY = 0 - LI_lineContainer[this.name].endPoint.Y;
 
             }
-            else if (lines[this.name].startPoint.y + changeY >= app.screen.height) {
-                changeY = app.screen.height - (lines[this.name].startPoint.y);
+            else if (LI_lineContainer[this.name].startPoint.y + changeY >= app.screen.height) {
+                changeY = app.screen.height - (LI_lineContainer[this.name].startPoint.y);
 
             }
-            else if (lines[this.name].endPoint.y + changeY >= app.screen.height) {
-                changeY = app.screen.height - (lines[this.name].endPoint.y);
+            else if (LI_lineContainer[this.name].endPoint.y + changeY >= app.screen.height) {
+                changeY = app.screen.height - (LI_lineContainer[this.name].endPoint.y);
             }
 
             if (move) {
-                lines[this.name].startPoint.changeLocation(lines[this.name].startPoint.x + changeX, lines[this.name].startPoint.y + changeY);
-                lines[this.name].endPoint.changeLocation(lines[this.name].endPoint.x + changeX, lines[this.name].endPoint.y + changeY);
+                LI_lineContainer[this.name].startPoint.changeLocation(LI_lineContainer[this.name].startPoint.x + changeX, LI_lineContainer[this.name].startPoint.y + changeY);
+                LI_lineContainer[this.name].endPoint.changeLocation(LI_lineContainer[this.name].endPoint.x + changeX, LI_lineContainer[this.name].endPoint.y + changeY);
                 this.dragx = newPosition.x;
                 this.dragy = newPosition.y;
-                lines[this.name].clearImage();
-                lines[this.name].resetImage();
+                LI_lineContainer[this.name].clearImage();
+                LI_lineContainer[this.name].resetImage();
             }
         }
     }
 }
 
 //drag graph
-function onDragGraphStart(event) {
-    if (state == 'edit') {
+function onDragLI_graphstart(event) {
+    if (LI_state == 'edit') {
         this.data = event.data;
         this.alpha = 0.5;
         this.dragging = true;
@@ -637,39 +594,45 @@ function onDragGraphStart(event) {
         this.dragy = event.data.global.y;
     }
 }
+
 function onDragGraphEnd() {
-    if (state == 'edit') {
+    if (LI_state == 'edit') {
         this.alpha = 1;
         this.dragging = false;
         this.data = null;
     }
 }
+
 function onDragGraphMove() {
-    if (state == 'edit') {
+    if (LI_state == 'edit') {
         if (this.dragging) {
+            
             const newPosition = this.data.getLocalPosition(this.parent);
             var changeX = newPosition.x - this.dragx;
             var changeY = newPosition.y - this.dragy;
-            if (boundary_tlx + changeX < 0) {
-                changeX = 0 - boundary_tlx;
+            
+            if (LI_boundary_tlx + changeX < 0) {
+                changeX = 0 - LI_boundary_tlx;
             }
-            else if (boundary_tlx + boundaryWidth + changeX >= app.screen.width) {
-                changeX = app.screen.width - (boundary_tlx + boundaryWidth);
+            else if (LI_boundary_tlx + boundaryWidth + changeX >= app.screen.width) {
+                changeX = app.screen.width - (LI_boundary_tlx + boundaryWidth);
             }
 
-            if (boundary_tly + changeY < 0) {
-                changeY = 0 - boundary_tly;
+            if (LI_boundary_tly + changeY < 0) {
+                changeY = 0 - LI_boundary_tly;
             }
-            else if (boundary_tly + boundaryHeight + changeY >= app.screen.height) {
-                changeY = app.screen.height - (boundary_tly + boundaryHeight);
+            else if (LI_boundary_tly + boundaryHeight + changeY >= app.screen.height) {
+                changeY = app.screen.height - (LI_boundary_tly + boundaryHeight);
             }
-            moveChildren(graphs, changeX, changeY);
-            moveChildren(hTextContainer, changeX, changeY);
-            moveChildren(vTextContainer, changeX, changeY);
+
+            
+
+            moveChildren(LI_graphs, changeX, changeY);
+
             this.dragy = newPosition.y;
             this.dragx = newPosition.x;
-            boundary_tlx += changeX;
-            boundary_tly += changeY;
+            LI_boundary_tlx += changeX;
+            LI_boundary_tly += changeY;
         }
     }
 }
@@ -682,62 +645,63 @@ function moveChildren(container, changeX, changeY) {
         child.y += changeY;
     }
 }
+
 function clearDown() {
 
 }
 
 /**
- * When releasing this actually changes the state to erase and changes the main text
+ * When releasing this actually changes the LI_state to erase and changes the main text
  * and hides the command buttons. This only occurs if the erase icon is visible.
  */
 function clearUp() {
     //if (this.alpha == 1) {
-    for (var i = 0; i < lines.length; i++) {
-        var line = lines[i];
-        if (line == currentLine) {
-            graphs.clear();
-            graphs.removeChildren();
+    for (var i = 0; i < LI_lineContainer.length; i++) {
+        var line = LI_lineContainer[i];
+        if (line == LI_currentLine) {
+            LI_graphs.clear();
+            LI_graphs.removeChildren();
 
-            graphics.clear();
+            LI_graphics.clear();
             // hTextContainer.removeChildren();
             // vTextContainer.removeChildren();
-            currentLine = -1;
+            LI_currentLine = -1;
         }
         line.removeLine();
         erasePoint(line.startPoint);
         erasePoint(line.endPoint);
     }
-    lines = [];
-    setMainText(richText, 0, lines);
+    LI_lineContainer = [];
+    setMainText(LI_mainText, 0, LI_lineContainer);
     //  }
 }
 
 /**
  * When a user clicks on a line that line will call this function which will decide on what to do
- * depending on the current state of the application.
+ * depending on the current LI_state of the application.
  * @param line the line that was selected by the user
  */
 function lineSelect(event) {
-    if (state == 'neutral') {   //Will display the information of said line
-        currentLine = lines[this.name];
-        createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
-        app.stage.addChild(graphs);
+    if (LI_state == 'neutral') {   //Will display the information of said line
+        LI_currentLine = LI_lineContainer[this.name];
+        createGraph(LI_graphs, LI_currentLine, LI_boundary_tlx, LI_boundary_tly);
+        app.stage.addChild(LI_graphs);
 
-        setMainText(richText, 0, lines);
+        setMainText(LI_mainText, 0, LI_lineContainer);
     }
-    else if (state == 'erase') {    //Will delete said line
-        eraseLine(lines[this.name]);
+    else if (LI_state == 'erase') {    //Will delete said line
+        eraseLine(LI_lineContainer[this.name]);
     }
-    else if (state == 'edit') {    //Will delete said line
+    else if (LI_state == 'edit') {    //Will delete said line
         this.alpha = 0.5;
-        lines[this.name].clearImage();
-        lines[this.name].resetImage();
-        lines[this.name].startPoint.image.alpha = 0.5;
-        lines[this.name].endPoint.image.alpha = 0.5;
-        if (currentLine != lines[this.name]) {
-            currentLine = lines[this.name];
-            createGraph(graphs, currentLine, boundary_tlx, boundary_tly);
-            app.stage.addChild(graphs);
+        LI_lineContainer[this.name].clearImage();
+        LI_lineContainer[this.name].resetImage();
+        LI_lineContainer[this.name].startPoint.image.alpha = 0.5;
+        LI_lineContainer[this.name].endPoint.image.alpha = 0.5;
+        if (LI_currentLine != LI_lineContainer[this.name]) {
+            LI_currentLine = LI_lineContainer[this.name];
+            createGraph(LI_graphs, LI_currentLine, LI_boundary_tlx, LI_boundary_tly);
+            app.stage.addChild(LI_graphs);
 
         }
         this.dragging = true;
@@ -746,5 +710,3 @@ function lineSelect(event) {
         this.dragy = event.data.global.y;
     }
 }
-
-

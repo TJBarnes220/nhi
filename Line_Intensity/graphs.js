@@ -1,9 +1,6 @@
-//Text style for words appearing on graph
-const graphText = new PIXI.TextStyle({
-    fontFamily: 'Arial',
-    fontSize: 7,
-    align: 'center',
-});
+var LI_boundaryWidth = 500;
+var LI_boundaryHeight = 300;
+
 /**
 * The create graph function contructs the visual representation of the data collected by the line
 * details function. A graph is handmade using rectangles, lines and text. The sizes
@@ -12,9 +9,6 @@ const graphText = new PIXI.TextStyle({
 * @param line the line object to extract information from
 */
 function createGraph(graphContainer, line, boundary_tlx, boundary_tly) {
-    var boundaryWidth = 500;
-    var boundaryHeight = 300;
-
 
     graphContainer.clear();
     graphContainer.removeChildren();
@@ -27,10 +21,10 @@ function createGraph(graphContainer, line, boundary_tlx, boundary_tly) {
     var outsideBoundary = new PIXI.Graphics();
     outsideBoundary.lineStyle(1, 0x000000, 1);
     outsideBoundary.beginFill(0xffffff);
-    outsideBoundary.drawRect(boundary_tlx, boundary_tly, boundaryWidth, boundaryHeight);
+    outsideBoundary.drawRect(boundary_tlx, boundary_tly, LI_boundaryWidth, LI_boundaryHeight);
     outsideBoundary.endFill();
     var polyPts;
-    polyPts = [boundary_tlx, boundary_tly, boundary_tlx, boundary_tly + boundaryHeight, boundary_tlx + boundaryWidth, boundary_tly + boundaryHeight, boundary_tlx + boundaryWidth, boundary_tly];
+    polyPts = [boundary_tlx, boundary_tly, boundary_tlx, boundary_tly + LI_boundaryHeight, boundary_tlx + LI_boundaryWidth, boundary_tly + LI_boundaryHeight, boundary_tlx + LI_boundaryWidth, boundary_tly];
     outsideBoundary.hitArea = new PIXI.Polygon(polyPts);
     graphContainer.addChild(outsideBoundary);
 

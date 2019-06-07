@@ -8,12 +8,14 @@
 function setMainText(pixiText, flag, lines) {
     if (flag == 0) {
         if (lines.length == 0) {
+            
             pixiText.text = 'You currently have 0 lines.';
         }
         else {
             //pixiText.text = 'You currently have ' + lines.length + ' Line(s) and the current entry is line ' + text + '.';
             pixiText.text = 'You currently have ' + lines.length + ' line(s).';
         }
+        
     }
     else if (flag == 1) {
         pixiText.text = 'Make a starting point for your line by clicking on the screen';
