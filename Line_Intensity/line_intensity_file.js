@@ -57,7 +57,7 @@ LI_clear_button.on('pointerdown', clearDown);
 LI_clear_button.on('pointerup', clearUp);
 LI_buttonCommands.push(LI_clear_button);
 
-const LI_cancel_button = new PIXI.Sprite.from('../images/LI_cancel_icon.png');
+const LI_cancel_button = new PIXI.Sprite.from('../images/cancel_icon.png');
 LI_cancel_button.width = 50;
 LI_cancel_button.height = 50;
 LI_cancel_button.x = 0;
@@ -65,17 +65,17 @@ LI_cancel_button.y = 0;
 LI_cancel_button.alpha = 0;
 LI_cancel_button.interactive = true;
 LI_cancel_button.buttonMode = true;
-LI_cancel_button.on('pointerdown', LI_cancelDown);
-LI_cancel_button.on('pointerup', LI_cancelUp);
-LI_cancel_button.on('pointerupoutside', LI_cancelOutSide);
+LI_cancel_button.on('pointerdown', cancelDown);
+LI_cancel_button.on('pointerup', cancelUp);
+LI_cancel_button.on('pointerupoutside', cancelOutSide);
 
-const LI_graphics = new PIXI.LI_graphics();
+const LI_graphics = new PIXI.Graphics();
 //LI_graphs deals with the actual graph drawn as a result to the line data
-const LI_graphs = new PIXI.LI_graphics();
+const LI_graphs = new PIXI.Graphics();
 LI_graphs.buttonMode = true;
 LI_graphs.interactive = true;
 LI_graphs
-    .on('pointerdown', onDragLI_graphstart)
+    .on('pointerdown', onDragGraphStart)
     .on('pointerup', onDragGraphEnd)
     .on('pointerupoutside', onDragGraphEnd)
     .on('pointermove', onDragGraphMove);
@@ -100,8 +100,9 @@ function showAll() {
     LI_backgroundImage.height = app.screen.height;
     
     app.stage.addChild(LI_cancel_button);
-    
-    for (var i = 0; i < LI_buttonCommands.length; i++) {
+
+    var bcLength = LI_buttonCommands.length;
+    for (var i = 0; i < bcLength; i++) {
         app.stage.addChild(LI_buttonCommands[i]);
         LI_buttonCommands[i].alpha = 1;
         LI_buttonCommands[i].interactive = true;
@@ -116,7 +117,7 @@ function showAll() {
     app.stage.addChild(LI_graphics);
     app.stage.addChild(LI_graphs);
 
-    LI_LI_boundary_tlx = app.screen.width / 2;
+    LI_boundary_tlx = app.screen.width / 2;
     LI_boundary_tly = app.screen.height / 2;
 
     //app.stage.interactive = true;
@@ -130,7 +131,8 @@ function showAll() {
 function hideAll() {
     LI_state = 'nuetral';
     clearUp();
-    for (var i = 0; i < LI_buttonCommands.length; i++) {
+    var bcLength = LI_buttonCommands.length;
+    for (var i = 0; i < bcLength; i++) {
         LI_buttonCommands[i].alpha = 0;
         LI_buttonCommands[i].interactive = false;
         LI_buttonCommands[i].buttonMode = false;
@@ -150,10 +152,11 @@ function hideAll() {
 /**
  * Once activating one of the command buttons they will all be hidden to reveal the LI_cancel button
  * This function provides that process but setting all the command buttons alpha values to zero and bringing the
- * LI_cancel button to the front to allow users to click on it.
+ * cancel button to the front to allow users to click on it.
  */
 function hideButtons() {
-    for (var i = 0; i < LI_buttonCommands.length; i++) {
+    var bcLength = LI_buttonCommands.length;
+    for (var i = 0; i < bcLength; i++) {
         LI_buttonCommands[i].alpha = 0;
         LI_buttonCommands[i].interactive = false;
         LI_buttonCommands[i].buttonMode = false;
@@ -164,10 +167,11 @@ function hideButtons() {
 
 /**
  * This simply does the opposite of hideButtons by revealing and bringing all command buttons to the front
- * while hiding the LI_cancel button.
+ * while hiding the cancel button.
  */
 function showButtons() {
-    for (var i = 0; i < LI_buttonCommands.length; i++) {
+    var bcLength = LI_buttonCommands.length;
+    for (var i = 0; i < bcLength; i++) {
         LI_buttonCommands[i].alpha = 1;
         LI_buttonCommands[i].interactive = true;
         LI_buttonCommands[i].buttonMode = true;
@@ -186,8 +190,8 @@ function showButtons() {
  * displayed and a graph will be created with its information.
  */
 function drawPoint(event) {
-   // if (LI_state == 'LI_drawing') { //Checks if in desired LI_state
-    //    if (!LI_cancel) {  //Checks if user clicked on LI_cancel button
+   // if (state == 'drawing') { //Checks if in desired LI_state
+    //    if (!cancel) {  //Checks if user clicked on LI_cancel button
             if (!LI_drawing) { //Checks what phase of line create user is in
                 LI_graphics.clear(); //Clears current LI_graphics on screen
                 //Changes LI_drawing value
@@ -209,7 +213,7 @@ function drawPoint(event) {
                 endPoint.image.name = LI_pointContainer.length;
                 LI_pointContainer.push(endPoint);
                 //Contructs the line graphic to be place inside the line object
-                var lineImage = new PIXI.LI_graphics();
+                var lineImage = new PIXI.Graphics();
                 lineImage.lineStyle(1, 0x9900CC)
                     .moveTo(LI_currentStart.x, LI_currentStart.y)
                     .lineTo(endPoint.x, endPoint.y);
@@ -288,7 +292,7 @@ function activateUp(event) {
     if (this.alpha == 1) {
         setMainText(LI_mainText, 1, LI_lineContainer);
         hideButtons();
-        LI_state = 'LI_drawing';
+        LI_state = 'drawing';
         app.stage.interactive = true;
     }
 }
@@ -315,7 +319,7 @@ function endDraw() {
  * This is to allow the user to change their mind by releasing outside the button.
  * @param event the action of clicking on the LI_cancel button sprite
  */
-function LI_cancelDown(event) {
+function cancelDown(event) {
     LI_cancel = true;
     app.stage.interactive = false;
 }// end LI_cancel draw
@@ -324,7 +328,7 @@ function LI_cancelDown(event) {
  * This is to undo the contents of LI_cancel down without actually changing LI_states
  * @param event
  */
-function LI_cancelOutSide(event) {
+function cancelOutSide(event) {
     LI_cancel = false;
 }
 
@@ -334,10 +338,10 @@ function LI_cancelOutSide(event) {
  * get destroyed and so on.
  *
  */
-function LI_cancelUp(event) {
+function cancelUp(event) {
     //Resets LI_cancel value
     if (LI_cancel) {
-        if (LI_state == 'LI_drawing') {
+        if (LI_state == 'drawing') {
             app.stage.interactive = false;
 
             setMainText(LI_mainText, 0, LI_lineContainer);
@@ -585,7 +589,7 @@ function onDragLineMove() {
 }
 
 //drag graph
-function onDragLI_graphstart(event) {
+function onDragGraphStart(event) {
     if (LI_state == 'edit') {
         this.data = event.data;
         this.alpha = 0.5;
@@ -614,15 +618,15 @@ function onDragGraphMove() {
             if (LI_boundary_tlx + changeX < 0) {
                 changeX = 0 - LI_boundary_tlx;
             }
-            else if (LI_boundary_tlx + boundaryWidth + changeX >= app.screen.width) {
-                changeX = app.screen.width - (LI_boundary_tlx + boundaryWidth);
+            else if (LI_boundary_tlx + LI_boundaryWidth + changeX >= app.screen.width) {
+                changeX = app.screen.width - (LI_boundary_tlx + LI_boundaryWidth);
             }
 
             if (LI_boundary_tly + changeY < 0) {
                 changeY = 0 - LI_boundary_tly;
             }
-            else if (LI_boundary_tly + boundaryHeight + changeY >= app.screen.height) {
-                changeY = app.screen.height - (LI_boundary_tly + boundaryHeight);
+            else if (LI_boundary_tly + LI_boundaryHeight + changeY >= app.screen.height) {
+                changeY = app.screen.height - (LI_boundary_tly + LI_boundaryHeight);
             }
 
             
